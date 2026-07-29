@@ -1,0 +1,19 @@
+{
+    "model_size": "whisper-large-v3",
+    "language": "ru",
+    "device": "cloud",
+    "compute_type": "default",
+    "hotkey": "ctrl+space",
+    "hotkey_mode": "toggle",
+    "audio_device": null,
+    "auto_paste": true,
+    "add_trailing_space": true,
+    "sound_feedback": true,
+    "always_on_top": true,
+    "widget_position": {
+        "x": 2606,
+        "y": 1623
+    },
+    "widget_opacity": 0.92,
+    "theme": "cyberpunk_dark"
+}
