@@ -7,7 +7,7 @@ from PyQt6.QtGui import QColor, QFont, QPainter, QBrush, QPen, QLinearGradient, 
 
 class SciFiWaveVisualizer(QWidget):
     """
-    14-bar Cyberpunk spectrum visualizer with smooth physics interpolation and peak caps.
+    14-bar spectrum visualizer tuned for OLED Black theme.
     """
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -33,7 +33,6 @@ class SciFiWaveVisualizer(QWidget):
             base = min(1.0, max(0.12, rms * 9.0))
             new_targets = []
             for i in range(self.num_bars):
-                # Frequency distribution curve effect
                 center_factor = 1.0 - abs(i - self.num_bars / 2) / (self.num_bars / 2) * 0.4
                 val = min(1.0, max(0.08, base * center_factor * (0.6 + random.random() * 0.8)))
                 new_targets.append(val)
@@ -48,13 +47,11 @@ class SciFiWaveVisualizer(QWidget):
     def _update_physics(self):
         changed = False
         for i in range(self.num_bars):
-            # Smooth lerp
             target = self.target_levels[i]
             curr = self.current_levels[i]
             diff = target - curr
             self.current_levels[i] += diff * 0.25
 
-            # Peak decay physics
             if self.current_levels[i] > self.peaks[i]:
                 self.peaks[i] = self.current_levels[i]
             else:
@@ -77,13 +74,11 @@ class SciFiWaveVisualizer(QWidget):
         total_w = self.num_bars * bar_w + (self.num_bars - 1) * spacing
         start_x = (w - total_w) // 2
 
-        # Transcribing pulse animation effect
         import time
         t = time.time() * 8.0
 
         for i in range(self.num_bars):
             if self.state == "transcribing":
-                # Travelling wave during transcription
                 import math
                 val = 0.3 + 0.6 * (0.5 + 0.5 * math.sin(t - i * 0.4))
                 bar_h = max(3, int(h * val))
@@ -93,7 +88,6 @@ class SciFiWaveVisualizer(QWidget):
             x = start_x + i * (bar_w + spacing)
             y = h - bar_h
 
-            # Color scheme based on state
             if self.state == "recording":
                 color_top = QColor(255, 255, 255)
                 color_bot = QColor(0, 240, 255)
@@ -101,8 +95,8 @@ class SciFiWaveVisualizer(QWidget):
                 color_top = QColor(255, 230, 100)
                 color_bot = QColor(255, 140, 0)
             else:
-                color_top = QColor(160, 175, 195, 180)
-                color_bot = QColor(80, 95, 115, 120)
+                color_top = QColor(160, 160, 160, 180)
+                color_bot = QColor(60, 60, 60, 120)
 
             gradient = QLinearGradient(x, h, x, y)
             gradient.setColorAt(0, color_bot)
@@ -112,7 +106,6 @@ class SciFiWaveVisualizer(QWidget):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRoundedRect(x, y, bar_w, bar_h, 1, 1)
 
-            # Draw peak caps
             if self.state == "recording":
                 peak_y = int(h - (h * self.peaks[i])) - 2
                 peak_y = max(0, min(h - 2, peak_y))
@@ -121,7 +114,7 @@ class SciFiWaveVisualizer(QWidget):
 
 
 class CyberpunkHistoryDrawer(QFrame):
-    """Collapsible Frosted Glass History Drawer."""
+    """Collapsible OLED Black History Drawer."""
     item_reinject_signal = pyqtSignal(str)
 
     def __init__(self, history_mgr, parent=None):
@@ -132,8 +125,8 @@ class CyberpunkHistoryDrawer(QFrame):
     def init_ui(self):
         self.setStyleSheet("""
             QFrame {
-                background: rgba(10, 12, 16, 0.95);
-                border: 1px solid rgba(255, 255, 255, 0.12);
+                background: #000000;
+                border: 1px solid #27272a;
                 border-top: none;
                 border-bottom-left-radius: 12px;
                 border-bottom-right-radius: 12px;
@@ -142,36 +135,36 @@ class CyberpunkHistoryDrawer(QFrame):
                 background: transparent;
                 border: none;
                 outline: none;
-                color: #e2e8f0;
+                color: #f4f4f5;
             }
             QListWidget::item {
-                background: rgba(255, 255, 255, 0.04);
-                border: 1px solid rgba(255, 255, 255, 0.06);
+                background: #050505;
+                border: 1px solid #1f1f23;
                 border-radius: 6px;
                 padding: 6px 8px;
                 margin-bottom: 4px;
                 font-size: 11px;
             }
             QListWidget::item:hover {
-                background: rgba(0, 240, 255, 0.15);
-                border-color: rgba(0, 240, 255, 0.4);
-                color: #ffffff;
+                background: #00f0ff;
+                border-color: #00f0ff;
+                color: #000000;
             }
             QLabel {
-                color: #718096;
+                color: #a1a1aa;
                 font-size: 10px;
                 font-weight: bold;
                 letter-spacing: 1px;
             }
             QPushButton#btnClear {
                 background: transparent;
-                color: #718096;
+                color: #a1a1aa;
                 border: none;
                 font-size: 10px;
                 font-weight: bold;
             }
             QPushButton#btnClear:hover {
-                color: #ff3366;
+                color: #ef4444;
             }
         """)
 
@@ -179,7 +172,6 @@ class CyberpunkHistoryDrawer(QFrame):
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(6)
 
-        # Header bar inside history drawer
         hdr_layout = QHBoxLayout()
         lbl_hdr = QLabel("ИСТОРИЯ ВВОДА")
         self.btn_clear = QPushButton("ОЧИСТИТЬ", self)
@@ -192,7 +184,6 @@ class CyberpunkHistoryDrawer(QFrame):
         hdr_layout.addWidget(self.btn_clear)
         layout.addLayout(hdr_layout)
 
-        # List Widget
         self.list_widget = QListWidget(self)
         self.list_widget.itemClicked.connect(self._on_item_clicked)
         layout.addWidget(self.list_widget)
@@ -237,7 +228,6 @@ class DesktopWidget(QWidget):
         self.init_window_flags()
         self.init_ui()
 
-        # Audio metering timer (60 FPS)
         self.timer = QTimer(self)
         self.timer.setInterval(16)
         self.current_rms_provider = None
@@ -252,40 +242,36 @@ class DesktopWidget(QWidget):
 
     def init_ui(self):
         self.setFixedWidth(320)
-        self.setFixedHeight(70) # Default compact height without history drawer
+        self.setFixedHeight(70)
 
         main_v_layout = QVBoxLayout(self)
         main_v_layout.setContentsMargins(0, 0, 0, 0)
         main_v_layout.setSpacing(0)
 
-        # 1. Main Frosted Glass Top Widget Frame
+        # Main OLED Black Frame
         self.main_frame = QFrame(self)
         self.main_frame.setFixedHeight(64)
         self.main_frame.setStyleSheet("""
             QFrame {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                            stop:0 rgba(18, 20, 26, 0.94),
-                            stop:1 rgba(10, 12, 16, 0.96));
-                border: 1px solid rgba(255, 255, 255, 0.14);
+                background: #000000;
+                border: 1px solid #27272a;
                 border-radius: 14px;
             }
         """)
 
         shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(24)
-        shadow.setColor(QColor(0, 0, 0, 180))
-        shadow.setOffset(0, 6)
+        shadow.setBlurRadius(20)
+        shadow.setColor(QColor(0, 0, 0, 255))
+        shadow.setOffset(0, 4)
         self.main_frame.setGraphicsEffect(shadow)
 
         layout = QHBoxLayout(self.main_frame)
         layout.setContentsMargins(12, 8, 12, 8)
         layout.setSpacing(10)
 
-        # 1. Cyberpunk 14-bar Wave Spectrum Visualizer
         self.visualizer = SciFiWaveVisualizer(self.main_frame)
         layout.addWidget(self.visualizer)
 
-        # 2. Middle Column: Status Text & Hotkey Badge (No redundant app title!)
         mid_layout = QVBoxLayout()
         mid_layout.setSpacing(2)
 
@@ -296,11 +282,11 @@ class DesktopWidget(QWidget):
         self.lbl_hotkey = QLabel(f"HOLD [{self.config.get('hotkey', 'caps_lock').upper()}]")
         self.lbl_hotkey.setFont(QFont("Consolas", 8, QFont.Weight.Bold))
         self.lbl_hotkey.setStyleSheet("""
-            background: rgba(255, 255, 255, 0.08);
-            color: #a0aec0;
+            background: #09090b;
+            color: #a1a1aa;
             border-radius: 3px;
             padding: 1px 5px;
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            border: 1px solid #27272a;
         """)
 
         mid_layout.addWidget(self.lbl_status)
@@ -309,15 +295,14 @@ class DesktopWidget(QWidget):
 
         layout.addStretch()
 
-        # 3. Action Buttons (HIST, ⚙, ✕)
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(3)
 
         cyber_btn_style = """
             QPushButton {
-                background: rgba(255, 255, 255, 0.05);
-                color: #a0aec0;
-                border: 1px solid rgba(255, 255, 255, 0.08);
+                background: #000000;
+                color: #a1a1aa;
+                border: 1px solid #27272a;
                 font-family: 'Consolas', sans-serif;
                 font-size: 10px;
                 font-weight: bold;
@@ -325,9 +310,9 @@ class DesktopWidget(QWidget):
                 padding: 3px 6px;
             }
             QPushButton:hover {
-                color: #ffffff;
-                background: rgba(0, 240, 255, 0.2);
-                border-color: rgba(0, 240, 255, 0.5);
+                color: #000000;
+                background: #00f0ff;
+                border-color: #00f0ff;
             }
         """
 
@@ -356,7 +341,6 @@ class DesktopWidget(QWidget):
 
         main_v_layout.addWidget(self.main_frame)
 
-        # 2. History Drawer (Collapsible)
         if self.history_mgr:
             self.history_drawer = CyberpunkHistoryDrawer(self.history_mgr, self)
             self.history_drawer.item_reinject_signal.connect(self.reinject_text_signal.emit)
@@ -374,9 +358,9 @@ class DesktopWidget(QWidget):
             self.setFixedHeight(230)
             self.btn_hist.setStyleSheet("""
                 QPushButton {
-                    background: rgba(0, 240, 255, 0.25);
-                    color: #ffffff;
-                    border: 1px solid rgba(0, 240, 255, 0.6);
+                    background: #00f0ff;
+                    color: #000000;
+                    border: 1px solid #00f0ff;
                     font-family: 'Consolas', sans-serif;
                     font-size: 10px;
                     font-weight: bold;
@@ -389,9 +373,9 @@ class DesktopWidget(QWidget):
             self.setFixedHeight(70)
             self.btn_hist.setStyleSheet("""
                 QPushButton {
-                    background: rgba(255, 255, 255, 0.05);
-                    color: #a0aec0;
-                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    background: #000000;
+                    color: #a1a1aa;
+                    border: 1px solid #27272a;
                     font-family: 'Consolas', sans-serif;
                     font-size: 10px;
                     font-weight: bold;
@@ -421,8 +405,8 @@ class DesktopWidget(QWidget):
         self.lbl_status.setStyleSheet("color: #ffffff; border: none; background: transparent;")
         self.main_frame.setStyleSheet("""
             QFrame {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(18, 20, 26, 0.94), stop:1 rgba(10, 12, 16, 0.96));
-                border: 1px solid rgba(255, 255, 255, 0.14);
+                background: #000000;
+                border: 1px solid #27272a;
                 border-radius: 14px;
             }
         """)
@@ -433,8 +417,8 @@ class DesktopWidget(QWidget):
         self.lbl_status.setStyleSheet("color: #00f0ff; font-weight: bold; border: none; background: transparent;")
         self.main_frame.setStyleSheet("""
             QFrame {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(12, 30, 42, 0.96), stop:1 rgba(8, 18, 28, 0.98));
-                border: 1.5px solid rgba(0, 240, 255, 0.85);
+                background: #000000;
+                border: 1.5px solid #00f0ff;
                 border-radius: 14px;
             }
         """)
@@ -442,11 +426,11 @@ class DesktopWidget(QWidget):
     def set_state_transcribing(self):
         self.visualizer.set_state("transcribing")
         self.lbl_status.setText("⚡ PROCESSING")
-        self.lbl_status.setStyleSheet("color: #ffcc00; font-weight: bold; border: none; background: transparent;")
+        self.lbl_status.setStyleSheet("color: #eab308; font-weight: bold; border: none; background: transparent;")
         self.main_frame.setStyleSheet("""
             QFrame {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(32, 28, 12, 0.96), stop:1 rgba(18, 15, 8, 0.98));
-                border: 1.5px solid rgba(255, 204, 0, 0.85);
+                background: #000000;
+                border: 1.5px solid #eab308;
                 border-radius: 14px;
             }
         """)
@@ -455,11 +439,11 @@ class DesktopWidget(QWidget):
         self.visualizer.set_state("idle")
         display = f"✓ {text_preview[:10]}..." if len(text_preview) > 10 else f"✓ {text_preview}" if text_preview else "✓ COPIED"
         self.lbl_status.setText(display)
-        self.lbl_status.setStyleSheet("color: #00ffaa; font-weight: bold; border: none; background: transparent;")
+        self.lbl_status.setStyleSheet("color: #22c55e; font-weight: bold; border: none; background: transparent;")
         self.main_frame.setStyleSheet("""
             QFrame {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(10, 32, 22, 0.96), stop:1 rgba(6, 18, 12, 0.98));
-                border: 1.5px solid rgba(0, 255, 170, 0.85);
+                background: #000000;
+                border: 1.5px solid #22c55e;
                 border-radius: 14px;
             }
         """)

@@ -21,20 +21,20 @@ class SettingsDialog(QDialog):
     def init_ui(self):
         self.setStyleSheet("""
             QDialog {
-                background-color: #0c0e12;
-                color: #e2e8f0;
+                background-color: #000000;
+                color: #f4f4f5;
                 font-family: 'Consolas', 'Segoe UI', sans-serif;
             }
             QTabWidget::pane {
-                border: 1px solid rgba(255, 255, 255, 0.12);
+                border: 1px solid #27272a;
                 border-radius: 6px;
-                background-color: #0c0e12;
+                background-color: #000000;
                 padding: 12px;
             }
             QTabBar::tab {
-                background-color: #141720;
-                color: #a0aec0;
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                background-color: #09090b;
+                color: #a1a1aa;
+                border: 1px solid #27272a;
                 border-bottom: none;
                 border-top-left-radius: 6px;
                 border-top-right-radius: 6px;
@@ -45,17 +45,19 @@ class SettingsDialog(QDialog):
                 margin-right: 3px;
             }
             QTabBar::tab:selected {
-                background-color: rgba(0, 240, 255, 0.18);
+                background-color: #000000;
                 color: #00f0ff;
-                border-color: rgba(0, 240, 255, 0.45);
+                border-color: #00f0ff;
+                border-bottom: 1px solid #000000;
             }
             QTabBar::tab:hover:!selected {
-                background-color: rgba(255, 255, 255, 0.08);
+                background-color: #18181b;
                 color: #ffffff;
             }
             QGroupBox {
-                border: 1px solid rgba(255, 255, 255, 0.12);
+                border: 1px solid #27272a;
                 border-radius: 6px;
+                background-color: #000000;
                 margin-top: 10px;
                 padding-top: 15px;
                 font-weight: bold;
@@ -67,15 +69,16 @@ class SettingsDialog(QDialog):
                 subcontrol-origin: margin;
                 left: 10px;
                 padding: 0 5px;
+                background-color: #000000;
             }
             QLabel {
-                color: #a0aec0;
+                color: #a1a1aa;
                 font-size: 12px;
             }
             QComboBox {
-                background-color: #161a22;
+                background-color: #09090b;
                 color: #ffffff;
-                border: 1px solid rgba(255, 255, 255, 0.15);
+                border: 1px solid #27272a;
                 border-radius: 4px;
                 padding: 6px 10px;
                 font-size: 12px;
@@ -84,15 +87,15 @@ class SettingsDialog(QDialog):
                 border: none;
             }
             QComboBox QAbstractItemView {
-                background-color: #161a22;
+                background-color: #09090b;
                 color: #ffffff;
                 selection-background-color: #00f0ff;
                 selection-color: #000000;
             }
             QLineEdit, QDoubleSpinBox {
-                background-color: #161a22;
+                background-color: #09090b;
                 color: #00f0ff;
-                border: 1px solid rgba(255, 255, 255, 0.15);
+                border: 1px solid #27272a;
                 border-radius: 4px;
                 padding: 5px 8px;
                 font-size: 12px;
@@ -100,23 +103,23 @@ class SettingsDialog(QDialog):
                 font-weight: bold;
             }
             QCheckBox, QRadioButton {
-                color: #e2e8f0;
+                color: #f4f4f5;
                 font-size: 12px;
                 spacing: 8px;
             }
             QCheckBox::indicator, QRadioButton::indicator {
                 width: 14px;
                 height: 14px;
-                border: 1px solid rgba(255, 255, 255, 0.2);
+                border: 1px solid #27272a;
                 border-radius: 3px;
-                background: #161a22;
+                background: #09090b;
             }
             QCheckBox::indicator:checked, QRadioButton::indicator:checked {
                 background: #00f0ff;
                 border-color: #00f0ff;
             }
             QPushButton {
-                background: rgba(0, 240, 255, 0.15);
+                background: #000000;
                 color: #00f0ff;
                 font-weight: bold;
                 border: 1px solid #00f0ff;
@@ -130,12 +133,12 @@ class SettingsDialog(QDialog):
                 color: #000000;
             }
             QPushButton#btnCancel {
-                background-color: transparent;
-                color: #718096;
-                border: 1px solid #4a5568;
+                background-color: #000000;
+                color: #71717a;
+                border: 1px solid #27272a;
             }
             QPushButton#btnCancel:hover {
-                background-color: rgba(255, 255, 255, 0.05);
+                background-color: #18181b;
                 color: #ffffff;
             }
         """)
@@ -193,7 +196,7 @@ class SettingsDialog(QDialog):
 
         lbl_pause_desc = QLabel("⏱️ Время в секундах, через которое пауза в речи автоматически останавливает запись.")
         lbl_pause_desc.setFont(QFont("Consolas", 8))
-        lbl_pause_desc.setStyleSheet("color: #718096;")
+        lbl_pause_desc.setStyleSheet("color: #71717a;")
 
         self.chk_macros_enabled = QCheckBox("Голосовые макросы («Папочка вернулся», «Играем в танки», «Открой ...»)")
         self.chk_macros_enabled.setChecked(self.config.get("voice_macros_enabled", True))
@@ -243,9 +246,9 @@ class SettingsDialog(QDialog):
         lbl_hw = QLabel("🚀 Движок: Groq Cloud LPU API (whisper-large-v3)")
         lbl_hw.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
         lbl_hw.setStyleSheet("""
-            background: rgba(0, 240, 255, 0.1);
+            background: #000000;
             color: #00f0ff;
-            border: 1px solid rgba(0, 240, 255, 0.25);
+            border: 1px solid #00f0ff;
             border-radius: 4px;
             padding: 6px 10px;
         """)
@@ -253,7 +256,7 @@ class SettingsDialog(QDialog):
 
         lbl_env = QLabel("Ключ доступа: GROQ_API_KEY в файле .env")
         lbl_env.setFont(QFont("Consolas", 9))
-        lbl_env.setStyleSheet("color: #a0aec0; margin-top: 2px;")
+        lbl_env.setStyleSheet("color: #a1a1aa; margin-top: 2px;")
         model_layout.addWidget(lbl_env)
 
         lbl_lang = QLabel("Целевой язык распознавания:")

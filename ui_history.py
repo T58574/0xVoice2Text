@@ -20,14 +20,14 @@ class HistoryWindow(QDialog):
     def init_ui(self):
         self.setStyleSheet("""
             QDialog {
-                background-color: #0c0e12;
-                color: #e2e8f0;
+                background-color: #000000;
+                color: #f4f4f5;
                 font-family: 'Consolas', 'Segoe UI', sans-serif;
             }
             QLineEdit {
-                background-color: #161a22;
+                background-color: #09090b;
                 color: #ffffff;
-                border: 1px solid rgba(255, 255, 255, 0.15);
+                border: 1px solid #27272a;
                 border-radius: 6px;
                 padding: 8px 12px;
                 font-size: 12px;
@@ -36,26 +36,27 @@ class HistoryWindow(QDialog):
                 border-color: #00f0ff;
             }
             QListWidget {
-                background: #12151d;
-                border: 1px solid rgba(255, 255, 255, 0.12);
+                background: #000000;
+                border: 1px solid #27272a;
                 border-radius: 8px;
                 outline: none;
-                color: #e2e8f0;
+                color: #f4f4f5;
                 padding: 6px;
             }
             QListWidget::item {
-                background: rgba(255, 255, 255, 0.03);
-                border: 1px solid rgba(255, 255, 255, 0.06);
+                background: #050505;
+                border: 1px solid #1f1f23;
                 border-radius: 6px;
                 padding: 10px;
                 margin-bottom: 6px;
             }
             QListWidget::item:hover {
-                background: rgba(0, 240, 255, 0.12);
-                border-color: rgba(0, 240, 255, 0.4);
+                background: #00f0ff;
+                border-color: #00f0ff;
+                color: #000000;
             }
             QPushButton {
-                background: rgba(0, 240, 255, 0.15);
+                background: #000000;
                 color: #00f0ff;
                 font-weight: bold;
                 border: 1px solid #00f0ff;
@@ -69,12 +70,12 @@ class HistoryWindow(QDialog):
                 color: #000000;
             }
             QPushButton#btnDanger {
-                background: transparent;
-                color: #ff3366;
-                border-color: #ff3366;
+                background: #000000;
+                color: #ef4444;
+                border-color: #ef4444;
             }
             QPushButton#btnDanger:hover {
-                background: #ff3366;
+                background: #ef4444;
                 color: #ffffff;
             }
         """)
@@ -118,7 +119,7 @@ class HistoryWindow(QDialog):
 
         # Footer info
         self.lbl_count = QLabel("Total entries: 0")
-        self.lbl_count.setStyleSheet("color: #718096; font-size: 11px;")
+        self.lbl_count.setStyleSheet("color: #a1a1aa; font-size: 11px;")
         layout.addWidget(self.lbl_count)
 
         self.reload_history()

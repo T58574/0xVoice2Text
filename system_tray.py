@@ -3,14 +3,14 @@ from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor
 from PyQt6.QtCore import Qt
 
 def create_tray_icon_pixmap():
-    """Generates a crisp monochrome Cyberpunk microphone tray icon."""
+    """Generates a crisp monochrome OLED Black microphone tray icon."""
     pixmap = QPixmap(32, 32)
     pixmap.fill(Qt.GlobalColor.transparent)
     
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-    painter.setBrush(QColor(10, 12, 16))
+    painter.setBrush(QColor(0, 0, 0))
     painter.setPen(QColor(0, 240, 255))
     painter.drawRoundedRect(2, 2, 28, 28, 8, 8)
 
@@ -35,14 +35,14 @@ class SystemTrayApp:
 
         self.tray = QSystemTrayIcon()
         self.tray.setIcon(QIcon(create_tray_icon_pixmap()))
-        self.tray.setToolTip("0xVoice2Text // CYBERPUNK STT WIDGET")
+        self.tray.setToolTip("0xVoice2Text // OLED BLACK EDITION")
 
         menu = QMenu()
         menu.setStyleSheet("""
             QMenu {
-                background-color: #0c0e12;
-                color: #e2e8f0;
-                border: 1px solid rgba(0, 240, 255, 0.4);
+                background-color: #000000;
+                color: #f4f4f5;
+                border: 1px solid #27272a;
                 border-radius: 6px;
                 padding: 4px;
                 font-family: 'Consolas', sans-serif;
@@ -53,8 +53,8 @@ class SystemTrayApp:
                 border-radius: 4px;
             }
             QMenu::item:selected {
-                background-color: rgba(0, 240, 255, 0.2);
-                color: #00f0ff;
+                background-color: #00f0ff;
+                color: #000000;
             }
         """)
 
