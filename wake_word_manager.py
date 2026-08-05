@@ -30,6 +30,7 @@ class WakeWordManager:
         self.last_trigger_time = 0.0
         self.last_speech_time = 0.0
         self.has_spoken_in_recording = False
+        self.idle_rms_history = []
 
         self.wake_words = self._parse_word_list("wake_words", ["джарвис", "джарвиз", "жарвис"])
         self.stop_words = self._parse_word_list("stop_words", ["стоп", "стопнули"])
@@ -105,13 +106,21 @@ class WakeWordManager:
             with self._lock:
                 rec_state = self.is_recording_state
 
-            if rec_state:
-                # Voice Activity Detection during active recording
-                if rms > 0.015:
+            if not rec_state:
+                # Continuously calibrate ambient microphone noise floor during IDLE
+                self.idle_rms_history.append(rms)
+                if len(self.idle_rms_history) > 60: # ~1.5 sec rolling window
+                    self.idle_rms_history.pop(0)
+            else:
+                # Dynamic Adaptive Speech Threshold: 2.2x background noise floor
+                ambient_floor = float(np.median(self.idle_rms_history)) if self.idle_rms_history else 0.005
+                speech_threshold = max(0.012, ambient_floor * 2.2 + 0.006)
+
+                if rms > speech_threshold:
                     self.last_speech_time = now
                     self.has_spoken_in_recording = True
-                elif self.has_spoken_in_recording and (now - self.last_speech_time > 1.2) and (now - self.last_trigger_time > 1.5):
-                    print("[WakeWordManager] ⏱️ SILENCE DETECTED (1.2s pause) -> Auto-stopping recording!")
+                elif self.has_spoken_in_recording and (now - self.last_speech_time > 1.1) and (now - self.last_trigger_time > 1.4):
+                    print(f"[WakeWordManager] ⏱️ ADAPTIVE SILENCE DETECTED (RMS: {rms:.4f} <= Thresh: {speech_threshold:.4f}, NoiseFloor: {ambient_floor:.4f}) -> Auto-stopping!")
                     self.has_spoken_in_recording = False
                     self.last_trigger_time = now
                     if self.on_stop_detected:
@@ -120,11 +129,23 @@ class WakeWordManager:
             if rec.AcceptWaveform(pcm16):
                 result_json = json.loads(rec.Result())
                 text = result_json.get("text", "").lower()
+
+                # If Vosk completed an utterance during recording after speech was detected
+                if rec_state and self.has_spoken_in_recording and (now - self.last_trigger_time > 1.4):
+                    print(f"[WakeWordManager] 🗣️ VOSK UTTERANCE COMPLETED -> Auto-stopping recording!")
+                    self.has_spoken_in_recording = False
+                    self.last_trigger_time = now
+                    if self.on_stop_detected:
+                        self.on_stop_detected()
+
                 self._check_text(text)
             else:
                 partial_json = json.loads(rec.PartialResult())
                 partial_text = partial_json.get("partial", "").lower()
                 if partial_text:
+                    if rec_state:
+                        self.has_spoken_in_recording = True
+                        self.last_speech_time = now
                     self._check_text(partial_text)
 
         device = self.config.get("audio_device")
