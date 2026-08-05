@@ -10,6 +10,9 @@ DEFAULT_CONFIG = {
     "compute_type": "default",
     "hotkey": "ctrl+space",          # ctrl+space, alt+3, caps_lock, f8, f9, etc.
     "hotkey_mode": "toggle",         # toggle, push_to_talk
+    "wake_word_enabled": True,       # Enable voice wake word trigger
+    "wake_words": "джарвис, джарвиз, жарвис",
+    "stop_words": "стоп",
     "audio_device": None,
     "auto_paste": True,
     "add_trailing_space": True,

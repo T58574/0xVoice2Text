@@ -22,6 +22,7 @@ from ui_history import HistoryWindow
 from ui_mouse_hud import MouseHUDOverlay
 from system_tray import SystemTrayApp
 from ipc_event_bus import IPCEventBus
+from wake_word_manager import WakeWordManager
 import sound_effects
 
 class SignalBridge(QObject):
@@ -80,6 +81,13 @@ class ApplicationController:
             on_stop=self.on_hotkey_stop
         )
 
+        # Wake Word & Voice Stop Manager (Vosk)
+        self.wake_mgr = WakeWordManager(
+            config=self.config,
+            on_wake_detected=self.on_hotkey_start,
+            on_stop_detected=self.on_hotkey_stop
+        )
+
         # System Tray
         self.tray = SystemTrayApp(
             app=self.app,
@@ -94,8 +102,9 @@ class ApplicationController:
         # Load Groq STT Engine
         self.stt.load_model(on_complete=lambda ok: self.bridge.model_loaded.emit(ok))
 
-        # Start hotkey listener
+        # Start listeners
         self.hotkey_mgr.start()
+        self.wake_mgr.start()
 
     def _on_model_loaded(self, success):
         if success:
@@ -112,6 +121,9 @@ class ApplicationController:
         self.bridge.recording_stopped.emit()
 
     def _on_ui_recording_started(self):
+        # Notify wake manager recording state
+        self.wake_mgr.set_recording_state(True)
+
         # Trigger HUD ring animation around mouse cursor
         self.mouse_hud.trigger_around_cursor(duration_ms=1500)
 
@@ -121,6 +133,9 @@ class ApplicationController:
         self.recorder.start_recording()
 
     def _on_ui_recording_stopped(self):
+        # Notify wake manager recording state
+        self.wake_mgr.set_recording_state(False)
+
         if self.config.get("sound_feedback", True):
             sound_effects.play_stop_sound()
 
@@ -142,6 +157,12 @@ class ApplicationController:
         self.is_transcribing = False
         if not text or text.startswith("ERR") or text.startswith("ERROR"):
             self.widget.set_state_idle("ERR: GROQ KEY")
+            return
+
+        # Clean trailing stop words if present
+        text = self.wake_mgr.clean_transcription(text)
+        if not text:
+            self.widget.set_state_idle("READY")
             return
 
         # 1. Save to History Manager
@@ -202,10 +223,12 @@ class ApplicationController:
             self.config.get("hotkey", "ctrl+space"),
             mode=self.config.get("hotkey_mode", "toggle")
         )
+        self.wake_mgr.reload_config()
         self.widget.update_hotkey_badge()
 
     def exit_app(self):
         self.hotkey_mgr.stop()
+        self.wake_mgr.stop()
         self.recorder.stop_recording()
         self.app.quit()
 

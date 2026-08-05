@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
-    QCheckBox, QPushButton, QRadioButton, QGroupBox
+    QCheckBox, QPushButton, QRadioButton, QGroupBox, QLineEdit
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QCursor
@@ -12,7 +12,8 @@ class SettingsDialog(QDialog):
         self.config = config
         self.on_save_callback = on_save_callback
         self.setWindowTitle("0xVoice2Text // SETTINGS")
-        self.resize(440, 500)
+        self.resize(440, 620)
+
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)
         self.init_ui()
 
@@ -58,6 +59,15 @@ class SettingsDialog(QDialog):
                 color: #ffffff;
                 selection-background-color: #00f0ff;
                 selection-color: #000000;
+            }
+            QLineEdit {
+                background-color: #161a22;
+                color: #00f0ff;
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 4px;
+                padding: 5px 8px;
+                font-size: 12px;
+                font-family: 'Consolas', sans-serif;
             }
             QCheckBox, QRadioButton {
                 color: #e2e8f0;
@@ -206,7 +216,36 @@ class SettingsDialog(QDialog):
         hk_group.setLayout(hk_layout)
         layout.addWidget(hk_group)
 
-        # 4. Toggles
+        # 4. Voice Trigger (Vosk Wake & Stop Words) Group
+        voice_group = QGroupBox("VOICE TRIGGER CONTROL (VOSK OFFLINE)")
+        voice_layout = QVBoxLayout()
+
+        self.chk_wake_enabled = QCheckBox("Активация голосом по кодовому слову")
+        self.chk_wake_enabled.setChecked(self.config.get("wake_word_enabled", True))
+
+        wake_h_layout = QHBoxLayout()
+        lbl_wake = QLabel("Слово старта:")
+        self.txt_wake_words = QLineEdit()
+        self.txt_wake_words.setText(str(self.config.get("wake_words", "джарвис, джарвиз, жарвис")))
+        self.txt_wake_words.setPlaceholderText("джарвис, джарвиз")
+        wake_h_layout.addWidget(lbl_wake)
+        wake_h_layout.addWidget(self.txt_wake_words)
+
+        stop_h_layout = QHBoxLayout()
+        lbl_stop = QLabel("Слово стоп:")
+        self.txt_stop_words = QLineEdit()
+        self.txt_stop_words.setText(str(self.config.get("stop_words", "стоп")))
+        self.txt_stop_words.setPlaceholderText("стоп")
+        stop_h_layout.addWidget(lbl_stop)
+        stop_h_layout.addWidget(self.txt_stop_words)
+
+        voice_layout.addWidget(self.chk_wake_enabled)
+        voice_layout.addLayout(wake_h_layout)
+        voice_layout.addLayout(stop_h_layout)
+        voice_group.setLayout(voice_layout)
+        layout.addWidget(voice_group)
+
+        # 5. Toggles
         opts_layout = QVBoxLayout()
         self.chk_auto_paste = QCheckBox("Auto-paste text into active focus window")
         self.chk_auto_paste.setChecked(self.config.get("auto_paste", True))
@@ -226,7 +265,7 @@ class SettingsDialog(QDialog):
         opts_layout.addWidget(self.chk_ontop)
         layout.addLayout(opts_layout)
 
-        # 5. Buttons
+        # 6. Buttons
         btn_layout = QHBoxLayout()
         btn_save = QPushButton("SAVE CONFIG")
         btn_cancel = QPushButton("CANCEL")
@@ -255,6 +294,9 @@ class SettingsDialog(QDialog):
         self.config.set("language", lang)
         self.config.set("hotkey", hk)
         self.config.set("hotkey_mode", mode)
+        self.config.set("wake_word_enabled", self.chk_wake_enabled.isChecked())
+        self.config.set("wake_words", self.txt_wake_words.text())
+        self.config.set("stop_words", self.txt_stop_words.text())
         self.config.set("auto_paste", self.chk_auto_paste.isChecked())
         self.config.set("add_trailing_space", self.chk_trailing_space.isChecked())
         self.config.set("sound_feedback", self.chk_sound.isChecked())
@@ -264,3 +306,4 @@ class SettingsDialog(QDialog):
             self.on_save_callback()
 
         self.accept()
+

@@ -11,8 +11,8 @@
     "sound_feedback": true,
     "always_on_top": true,
     "widget_position": {
-        "x": 2606,
-        "y": 1623
+        "x": 2234,
+        "y": 32
     },
     "widget_opacity": 0.92,
     "theme": "cyberpunk_dark"

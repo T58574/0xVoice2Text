@@ -6,3 +6,4 @@ pyperclip>=1.8.2
 pywin32>=306
 groq>=0.9.0
 python-dotenv>=1.0.0
+vosk>=0.3.45
