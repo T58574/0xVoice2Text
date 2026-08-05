@@ -13,6 +13,7 @@ DEFAULT_CONFIG = {
     "wake_word_enabled": True,       # Enable voice wake word trigger
     "wake_words": "джарвис, джарвиз, жарвис",
     "stop_words": "стоп",
+    "silence_timeout": 3.0,          # Pause timeout in seconds before auto-stop
     "voice_macros_enabled": True,    # Enable voice app launching and macro commands
     "audio_device": None,
     "auto_paste": True,

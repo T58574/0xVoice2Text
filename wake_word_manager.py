@@ -115,12 +115,13 @@ class WakeWordManager:
                 # Dynamic Adaptive Speech Threshold: 2.2x background noise floor
                 ambient_floor = float(np.median(self.idle_rms_history)) if self.idle_rms_history else 0.005
                 speech_threshold = max(0.012, ambient_floor * 2.2 + 0.006)
+                silence_limit = float(self.config.get("silence_timeout", 3.0))
 
                 if rms > speech_threshold:
                     self.last_speech_time = now
                     self.has_spoken_in_recording = True
-                elif self.has_spoken_in_recording and (now - self.last_speech_time > 1.1) and (now - self.last_trigger_time > 1.4):
-                    print(f"[WakeWordManager] ⏱️ ADAPTIVE SILENCE DETECTED (RMS: {rms:.4f} <= Thresh: {speech_threshold:.4f}, NoiseFloor: {ambient_floor:.4f}) -> Auto-stopping!")
+                elif self.has_spoken_in_recording and (now - self.last_speech_time > silence_limit) and (now - self.last_trigger_time > 1.4):
+                    print(f"[WakeWordManager] ⏱️ ADAPTIVE SILENCE DETECTED ({silence_limit}s pause, RMS: {rms:.4f} <= Thresh: {speech_threshold:.4f}) -> Auto-stopping!")
                     self.has_spoken_in_recording = False
                     self.last_trigger_time = now
                     if self.on_stop_detected:
