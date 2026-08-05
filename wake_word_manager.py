@@ -28,6 +28,8 @@ class WakeWordManager:
         self._lock = threading.Lock()
         self.stream = None
         self.last_trigger_time = 0.0
+        self.last_speech_time = 0.0
+        self.has_spoken_in_recording = False
 
         self.wake_words = self._parse_word_list("wake_words", ["джарвис", "джарвиз", "жарвис"])
         self.stop_words = self._parse_word_list("stop_words", ["стоп", "стопнули"])
@@ -72,6 +74,9 @@ class WakeWordManager:
         """Notifies the manager whether recording is currently active."""
         with self._lock:
             self.is_recording_state = is_recording
+            if is_recording:
+                self.has_spoken_in_recording = False
+                self.last_speech_time = time.time()
 
     def _run_loop(self):
         print("[WakeWordManager] Loading local Vosk Russian model (vosk-model-small-ru-0.22)...")
@@ -92,6 +97,25 @@ class WakeWordManager:
             # Convert float32 input buffer [-1.0, 1.0] to 16-bit int PCM bytes
             mono_float = indata[:, 0]
             pcm16 = (mono_float * 32767).astype(np.int16).tobytes()
+
+            # Calculate RMS for Silence Detection (VAD)
+            rms = float(np.sqrt(np.mean(mono_float ** 2))) if len(mono_float) > 0 else 0.0
+            now = time.time()
+
+            with self._lock:
+                rec_state = self.is_recording_state
+
+            if rec_state:
+                # Voice Activity Detection during active recording
+                if rms > 0.015:
+                    self.last_speech_time = now
+                    self.has_spoken_in_recording = True
+                elif self.has_spoken_in_recording and (now - self.last_speech_time > 1.2) and (now - self.last_trigger_time > 1.5):
+                    print("[WakeWordManager] ⏱️ SILENCE DETECTED (1.2s pause) -> Auto-stopping recording!")
+                    self.has_spoken_in_recording = False
+                    self.last_trigger_time = now
+                    if self.on_stop_detected:
+                        self.on_stop_detected()
 
             if rec.AcceptWaveform(pcm16):
                 result_json = json.loads(rec.Result())
