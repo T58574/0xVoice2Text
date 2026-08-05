@@ -132,15 +132,6 @@ class WakeWordManager:
             if rec.AcceptWaveform(pcm16):
                 result_json = json.loads(rec.Result())
                 text = result_json.get("text", "").lower()
-
-                # If Vosk completed an utterance during recording after speech was detected
-                if rec_state and self.has_spoken_in_recording and (now - self.last_trigger_time > 1.4):
-                    print(f"[WakeWordManager] 🗣️ VOSK UTTERANCE COMPLETED -> Auto-stopping recording!")
-                    self.has_spoken_in_recording = False
-                    self.last_trigger_time = now
-                    if self.on_stop_detected:
-                        self.on_stop_detected()
-
                 self._check_text(text)
             else:
                 partial_json = json.loads(rec.PartialResult())
