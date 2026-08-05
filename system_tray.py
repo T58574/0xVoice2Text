@@ -3,7 +3,7 @@ from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor
 from PyQt6.QtCore import Qt
 
 def create_tray_icon_pixmap():
-    """Generates a crisp monochrome OLED Black microphone tray icon."""
+    """Generates a crisp monochrome B&W OLED microphone tray icon."""
     pixmap = QPixmap(32, 32)
     pixmap.fill(Qt.GlobalColor.transparent)
     
@@ -11,14 +11,14 @@ def create_tray_icon_pixmap():
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
     painter.setBrush(QColor(0, 0, 0))
-    painter.setPen(QColor(0, 240, 255))
+    painter.setPen(QColor(255, 255, 255))
     painter.drawRoundedRect(2, 2, 28, 28, 8, 8)
 
     painter.setBrush(QColor(255, 255, 255))
     painter.setPen(Qt.PenStyle.NoPen)
     painter.drawRoundedRect(12, 8, 8, 11, 4, 4)
 
-    painter.setPen(QColor(0, 240, 255))
+    painter.setPen(QColor(255, 255, 255))
     painter.drawLine(16, 21, 16, 24)
     painter.drawLine(12, 24, 20, 24)
 
@@ -35,13 +35,13 @@ class SystemTrayApp:
 
         self.tray = QSystemTrayIcon()
         self.tray.setIcon(QIcon(create_tray_icon_pixmap()))
-        self.tray.setToolTip("0xVoice2Text // OLED BLACK EDITION")
+        self.tray.setToolTip("0xVoice2Text // B&W OLED EDITION")
 
         menu = QMenu()
         menu.setStyleSheet("""
             QMenu {
                 background-color: #000000;
-                color: #f4f4f5;
+                color: #ffffff;
                 border: 1px solid #27272a;
                 border-radius: 6px;
                 padding: 4px;
@@ -53,7 +53,7 @@ class SystemTrayApp:
                 border-radius: 4px;
             }
             QMenu::item:selected {
-                background-color: #00f0ff;
+                background-color: #ffffff;
                 color: #000000;
             }
         """)

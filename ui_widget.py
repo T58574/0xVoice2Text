@@ -7,7 +7,7 @@ from PyQt6.QtGui import QColor, QFont, QPainter, QBrush, QPen, QLinearGradient, 
 
 class SciFiWaveVisualizer(QWidget):
     """
-    14-bar spectrum visualizer tuned for OLED Black theme.
+    14-bar monochrome visualizer tuned for Pure B&W OLED Black theme.
     """
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -19,7 +19,6 @@ class SciFiWaveVisualizer(QWidget):
         self.is_active = False
         self.state = "idle" # idle, recording, transcribing
 
-        # Smooth animation timer 60 FPS
         self.anim_timer = QTimer(self)
         self.anim_timer.setInterval(16) # ~60 fps
         self.anim_timer.timeout.connect(self._update_physics)
@@ -90,13 +89,13 @@ class SciFiWaveVisualizer(QWidget):
 
             if self.state == "recording":
                 color_top = QColor(255, 255, 255)
-                color_bot = QColor(0, 240, 255)
+                color_bot = QColor(140, 140, 140)
             elif self.state == "transcribing":
-                color_top = QColor(255, 230, 100)
-                color_bot = QColor(255, 140, 0)
+                color_top = QColor(220, 220, 220)
+                color_bot = QColor(80, 80, 80)
             else:
-                color_top = QColor(160, 160, 160, 180)
-                color_bot = QColor(60, 60, 60, 120)
+                color_top = QColor(120, 120, 120, 180)
+                color_bot = QColor(40, 40, 40, 120)
 
             gradient = QLinearGradient(x, h, x, y)
             gradient.setColorAt(0, color_bot)
@@ -114,7 +113,7 @@ class SciFiWaveVisualizer(QWidget):
 
 
 class CyberpunkHistoryDrawer(QFrame):
-    """Collapsible OLED Black History Drawer."""
+    """Collapsible B&W OLED Black History Drawer."""
     item_reinject_signal = pyqtSignal(str)
 
     def __init__(self, history_mgr, parent=None):
@@ -135,7 +134,7 @@ class CyberpunkHistoryDrawer(QFrame):
                 background: transparent;
                 border: none;
                 outline: none;
-                color: #f4f4f5;
+                color: #ffffff;
             }
             QListWidget::item {
                 background: #050505;
@@ -146,8 +145,8 @@ class CyberpunkHistoryDrawer(QFrame):
                 font-size: 11px;
             }
             QListWidget::item:hover {
-                background: #00f0ff;
-                border-color: #00f0ff;
+                background: #ffffff;
+                border-color: #ffffff;
                 color: #000000;
             }
             QLabel {
@@ -164,7 +163,7 @@ class CyberpunkHistoryDrawer(QFrame):
                 font-weight: bold;
             }
             QPushButton#btnClear:hover {
-                color: #ef4444;
+                color: #ffffff;
             }
         """)
 
@@ -248,7 +247,6 @@ class DesktopWidget(QWidget):
         main_v_layout.setContentsMargins(0, 0, 0, 0)
         main_v_layout.setSpacing(0)
 
-        # Main OLED Black Frame
         self.main_frame = QFrame(self)
         self.main_frame.setFixedHeight(64)
         self.main_frame.setStyleSheet("""
@@ -311,8 +309,8 @@ class DesktopWidget(QWidget):
             }
             QPushButton:hover {
                 color: #000000;
-                background: #00f0ff;
-                border-color: #00f0ff;
+                background: #ffffff;
+                border-color: #ffffff;
             }
         """
 
@@ -358,9 +356,9 @@ class DesktopWidget(QWidget):
             self.setFixedHeight(230)
             self.btn_hist.setStyleSheet("""
                 QPushButton {
-                    background: #00f0ff;
+                    background: #ffffff;
                     color: #000000;
-                    border: 1px solid #00f0ff;
+                    border: 1px solid #ffffff;
                     font-family: 'Consolas', sans-serif;
                     font-size: 10px;
                     font-weight: bold;
@@ -414,11 +412,11 @@ class DesktopWidget(QWidget):
     def set_state_recording(self):
         self.visualizer.set_state("recording")
         self.lbl_status.setText("● LISTENING")
-        self.lbl_status.setStyleSheet("color: #00f0ff; font-weight: bold; border: none; background: transparent;")
+        self.lbl_status.setStyleSheet("color: #ffffff; font-weight: bold; border: none; background: transparent;")
         self.main_frame.setStyleSheet("""
             QFrame {
                 background: #000000;
-                border: 1.5px solid #00f0ff;
+                border: 1.5px solid #ffffff;
                 border-radius: 14px;
             }
         """)
@@ -426,11 +424,11 @@ class DesktopWidget(QWidget):
     def set_state_transcribing(self):
         self.visualizer.set_state("transcribing")
         self.lbl_status.setText("⚡ PROCESSING")
-        self.lbl_status.setStyleSheet("color: #eab308; font-weight: bold; border: none; background: transparent;")
+        self.lbl_status.setStyleSheet("color: #a1a1aa; font-weight: bold; border: none; background: transparent;")
         self.main_frame.setStyleSheet("""
             QFrame {
                 background: #000000;
-                border: 1.5px solid #eab308;
+                border: 1.5px solid #a1a1aa;
                 border-radius: 14px;
             }
         """)
@@ -439,11 +437,11 @@ class DesktopWidget(QWidget):
         self.visualizer.set_state("idle")
         display = f"✓ {text_preview[:10]}..." if len(text_preview) > 10 else f"✓ {text_preview}" if text_preview else "✓ COPIED"
         self.lbl_status.setText(display)
-        self.lbl_status.setStyleSheet("color: #22c55e; font-weight: bold; border: none; background: transparent;")
+        self.lbl_status.setStyleSheet("color: #ffffff; font-weight: bold; border: none; background: transparent;")
         self.main_frame.setStyleSheet("""
             QFrame {
                 background: #000000;
-                border: 1.5px solid #22c55e;
+                border: 1.5px solid #ffffff;
                 border-radius: 14px;
             }
         """)

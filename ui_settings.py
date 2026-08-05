@@ -22,7 +22,7 @@ class SettingsDialog(QDialog):
         self.setStyleSheet("""
             QDialog {
                 background-color: #000000;
-                color: #f4f4f5;
+                color: #ffffff;
                 font-family: 'Consolas', 'Segoe UI', sans-serif;
             }
             QTabWidget::pane {
@@ -45,10 +45,10 @@ class SettingsDialog(QDialog):
                 margin-right: 3px;
             }
             QTabBar::tab:selected {
-                background-color: #000000;
-                color: #00f0ff;
-                border-color: #00f0ff;
-                border-bottom: 1px solid #000000;
+                background-color: #ffffff;
+                color: #000000;
+                border-color: #ffffff;
+                border-bottom: 1px solid #ffffff;
             }
             QTabBar::tab:hover:!selected {
                 background-color: #18181b;
@@ -62,7 +62,7 @@ class SettingsDialog(QDialog):
                 padding-top: 15px;
                 font-weight: bold;
                 font-size: 11px;
-                color: #00f0ff;
+                color: #ffffff;
                 letter-spacing: 1px;
             }
             QGroupBox::title {
@@ -89,12 +89,12 @@ class SettingsDialog(QDialog):
             QComboBox QAbstractItemView {
                 background-color: #09090b;
                 color: #ffffff;
-                selection-background-color: #00f0ff;
+                selection-background-color: #ffffff;
                 selection-color: #000000;
             }
             QLineEdit, QDoubleSpinBox {
                 background-color: #09090b;
-                color: #00f0ff;
+                color: #ffffff;
                 border: 1px solid #27272a;
                 border-radius: 4px;
                 padding: 5px 8px;
@@ -103,33 +103,33 @@ class SettingsDialog(QDialog):
                 font-weight: bold;
             }
             QCheckBox, QRadioButton {
-                color: #f4f4f5;
+                color: #ffffff;
                 font-size: 12px;
                 spacing: 8px;
             }
             QCheckBox::indicator, QRadioButton::indicator {
                 width: 14px;
                 height: 14px;
-                border: 1px solid #27272a;
+                border: 1px solid #3f3f46;
                 border-radius: 3px;
                 background: #09090b;
             }
             QCheckBox::indicator:checked, QRadioButton::indicator:checked {
-                background: #00f0ff;
-                border-color: #00f0ff;
+                background: #ffffff;
+                border-color: #ffffff;
             }
             QPushButton {
                 background: #000000;
-                color: #00f0ff;
+                color: #ffffff;
                 font-weight: bold;
-                border: 1px solid #00f0ff;
+                border: 1px solid #ffffff;
                 border-radius: 4px;
                 padding: 8px 18px;
                 font-size: 12px;
                 letter-spacing: 1px;
             }
             QPushButton:hover {
-                background: #00f0ff;
+                background: #ffffff;
                 color: #000000;
             }
             QPushButton#btnCancel {
@@ -149,7 +149,7 @@ class SettingsDialog(QDialog):
         # Title Label
         title_label = QLabel("⚡ 0xVoice2Text // SYSTEM CONFIGURATION")
         title_label.setFont(QFont("Consolas", 11, QFont.Weight.Bold))
-        title_label.setStyleSheet("color: #00f0ff; padding-bottom: 2px;")
+        title_label.setStyleSheet("color: #ffffff; padding-bottom: 2px;")
         main_layout.addWidget(title_label)
 
         # Tab Widget
@@ -183,18 +183,18 @@ class SettingsDialog(QDialog):
         stop_h_layout.addWidget(lbl_stop)
         stop_h_layout.addWidget(self.txt_stop_words)
 
-        # VAD Pause Delay Timeout Setting
+        # VAD Pause Delay Timeout Setting (Range extended to 60 seconds!)
         pause_h_layout = QHBoxLayout()
         lbl_pause = QLabel("Задержка молчания (VAD пауза):")
         self.spin_silence_timeout = QDoubleSpinBox()
-        self.spin_silence_timeout.setRange(0.5, 10.0)
+        self.spin_silence_timeout.setRange(0.5, 60.0)
         self.spin_silence_timeout.setSingleStep(0.5)
         self.spin_silence_timeout.setSuffix(" сек")
         self.spin_silence_timeout.setValue(float(self.config.get("silence_timeout", 3.0)))
         pause_h_layout.addWidget(lbl_pause)
         pause_h_layout.addWidget(self.spin_silence_timeout)
 
-        lbl_pause_desc = QLabel("⏱️ Время в секундах, через которое пауза в речи автоматически останавливает запись.")
+        lbl_pause_desc = QLabel("⏱️ Время в секундах (0.5 - 60.0 сек), через которое пауза в речи завершает запись.")
         lbl_pause_desc.setFont(QFont("Consolas", 8))
         lbl_pause_desc.setStyleSheet("color: #71717a;")
 
@@ -247,8 +247,8 @@ class SettingsDialog(QDialog):
         lbl_hw.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
         lbl_hw.setStyleSheet("""
             background: #000000;
-            color: #00f0ff;
-            border: 1px solid #00f0ff;
+            color: #ffffff;
+            border: 1px solid #ffffff;
             border-radius: 4px;
             padding: 6px 10px;
         """)

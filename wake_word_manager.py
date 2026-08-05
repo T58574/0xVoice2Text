@@ -31,6 +31,7 @@ class WakeWordManager:
         self.last_speech_time = 0.0
         self.has_spoken_in_recording = False
         self.idle_rms_history = []
+        self.silence_timeout = float(self.config.get("silence_timeout", 3.0))
 
         self.wake_words = self._parse_word_list("wake_words", ["джарвис", "джарвиз", "жарвис"])
         self.stop_words = self._parse_word_list("stop_words", ["стоп", "стопнули"])
@@ -47,7 +48,8 @@ class WakeWordManager:
         with self._lock:
             self.wake_words = self._parse_word_list("wake_words", ["джарвис", "джарвиз", "жарвис"])
             self.stop_words = self._parse_word_list("stop_words", ["стоп", "стопнули"])
-        print(f"[WakeWordManager] Reloaded config. Wake words: {self.wake_words}, Stop words: {self.stop_words}")
+            self.silence_timeout = float(self.config.get("silence_timeout", 3.0))
+        print(f"[WakeWordManager] Reloaded config. Wake words: {self.wake_words}, Stop words: {self.stop_words}, Silence timeout: {self.silence_timeout}s")
 
     def start(self):
         if not self.config.get("wake_word_enabled", True):
@@ -105,6 +107,7 @@ class WakeWordManager:
 
             with self._lock:
                 rec_state = self.is_recording_state
+                silence_limit = self.silence_timeout
 
             if not rec_state:
                 # Continuously calibrate ambient microphone noise floor during IDLE
@@ -115,7 +118,6 @@ class WakeWordManager:
                 # Dynamic Adaptive Speech Threshold: 2.2x background noise floor
                 ambient_floor = float(np.median(self.idle_rms_history)) if self.idle_rms_history else 0.005
                 speech_threshold = max(0.012, ambient_floor * 2.2 + 0.006)
-                silence_limit = float(self.config.get("silence_timeout", 3.0))
 
                 if rms > speech_threshold:
                     self.last_speech_time = now

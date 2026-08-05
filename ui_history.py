@@ -21,7 +21,7 @@ class HistoryWindow(QDialog):
         self.setStyleSheet("""
             QDialog {
                 background-color: #000000;
-                color: #f4f4f5;
+                color: #ffffff;
                 font-family: 'Consolas', 'Segoe UI', sans-serif;
             }
             QLineEdit {
@@ -33,14 +33,14 @@ class HistoryWindow(QDialog):
                 font-size: 12px;
             }
             QLineEdit:focus {
-                border-color: #00f0ff;
+                border-color: #ffffff;
             }
             QListWidget {
                 background: #000000;
                 border: 1px solid #27272a;
                 border-radius: 8px;
                 outline: none;
-                color: #f4f4f5;
+                color: #ffffff;
                 padding: 6px;
             }
             QListWidget::item {
@@ -51,32 +51,33 @@ class HistoryWindow(QDialog):
                 margin-bottom: 6px;
             }
             QListWidget::item:hover {
-                background: #00f0ff;
-                border-color: #00f0ff;
+                background: #ffffff;
+                border-color: #ffffff;
                 color: #000000;
             }
             QPushButton {
                 background: #000000;
-                color: #00f0ff;
+                color: #ffffff;
                 font-weight: bold;
-                border: 1px solid #00f0ff;
+                border: 1px solid #ffffff;
                 border-radius: 4px;
                 padding: 6px 14px;
                 font-size: 11px;
                 letter-spacing: 0.5px;
             }
             QPushButton:hover {
-                background: #00f0ff;
+                background: #ffffff;
                 color: #000000;
             }
             QPushButton#btnDanger {
                 background: #000000;
-                color: #ef4444;
-                border-color: #ef4444;
+                color: #a1a1aa;
+                border-color: #3f3f46;
             }
             QPushButton#btnDanger:hover {
-                background: #ef4444;
-                color: #ffffff;
+                background: #ffffff;
+                color: #000000;
+                border-color: #ffffff;
             }
         """)
 
@@ -88,7 +89,7 @@ class HistoryWindow(QDialog):
         hdr_layout = QHBoxLayout()
         title_lbl = QLabel("📜 TRANSCRIPTION HISTORY")
         title_lbl.setFont(QFont("Consolas", 12, QFont.Weight.Bold))
-        title_lbl.setStyleSheet("color: #00f0ff;")
+        title_lbl.setStyleSheet("color: #ffffff;")
         
         hdr_layout.addWidget(title_lbl)
         hdr_layout.addStretch()
