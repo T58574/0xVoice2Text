@@ -23,6 +23,7 @@ from ui_mouse_hud import MouseHUDOverlay
 from system_tray import SystemTrayApp
 from ipc_event_bus import IPCEventBus
 from wake_word_manager import WakeWordManager
+from macro_manager import MacroManager
 import sound_effects
 
 class SignalBridge(QObject):
@@ -87,6 +88,9 @@ class ApplicationController:
             on_wake_detected=self.on_hotkey_start,
             on_stop_detected=self.on_hotkey_stop
         )
+
+        # Voice Macro & Command Manager
+        self.macro_mgr = MacroManager(self.config)
 
         # System Tray
         self.tray = SystemTrayApp(
@@ -163,6 +167,25 @@ class ApplicationController:
         text = self.wake_mgr.clean_transcription(text)
         if not text:
             self.widget.set_state_idle("READY")
+            return
+
+        # Check if phrase matches a Voice Macro / Command action
+        is_macro, macro_desc = self.macro_mgr.process_text(text)
+        if is_macro:
+            self.history_mgr.add_entry(f"[CMD] {text} -> {macro_desc}")
+            if self.history_window and self.history_window.isVisible():
+                self.history_window.reload_history()
+
+            self.ipc.emit_transcription_event(
+                text=f"[CMD] {text} -> {macro_desc}",
+                engine="groq-whisper-large-v3",
+                language=self.config.get("language", "ru")
+            )
+
+            if self.config.get("sound_feedback", True):
+                sound_effects.play_success_sound()
+
+            self.widget.set_state_inserted(f"⚡ {macro_desc}")
             return
 
         # 1. Save to History Manager

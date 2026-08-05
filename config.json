@@ -5,14 +5,17 @@
     "compute_type": "default",
     "hotkey": "ctrl+space",
     "hotkey_mode": "toggle",
+    "wake_word_enabled": true,
+    "wake_words": "джарвис, джарвиз, жарвис",
+    "stop_words": "стоп",
     "audio_device": null,
     "auto_paste": true,
     "add_trailing_space": true,
     "sound_feedback": true,
     "always_on_top": true,
     "widget_position": {
-        "x": 2234,
-        "y": 32
+        "x": 2616,
+        "y": 125
     },
     "widget_opacity": 0.92,
     "theme": "cyberpunk_dark"

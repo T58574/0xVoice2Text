@@ -242,6 +242,11 @@ class SettingsDialog(QDialog):
         voice_layout.addWidget(self.chk_wake_enabled)
         voice_layout.addLayout(wake_h_layout)
         voice_layout.addLayout(stop_h_layout)
+
+        self.chk_macros_enabled = QCheckBox("Голосовые макросы и команды («Папочка вернулся», «Играем в танки», «Открой ...»)")
+        self.chk_macros_enabled.setChecked(self.config.get("voice_macros_enabled", True))
+        voice_layout.addWidget(self.chk_macros_enabled)
+
         voice_group.setLayout(voice_layout)
         layout.addWidget(voice_group)
 
@@ -297,6 +302,7 @@ class SettingsDialog(QDialog):
         self.config.set("wake_word_enabled", self.chk_wake_enabled.isChecked())
         self.config.set("wake_words", self.txt_wake_words.text())
         self.config.set("stop_words", self.txt_stop_words.text())
+        self.config.set("voice_macros_enabled", self.chk_macros_enabled.isChecked())
         self.config.set("auto_paste", self.chk_auto_paste.isChecked())
         self.config.set("add_trailing_space", self.chk_trailing_space.isChecked())
         self.config.set("sound_feedback", self.chk_sound.isChecked())
