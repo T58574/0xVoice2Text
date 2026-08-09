@@ -31,8 +31,8 @@ DEFAULT_CONFIG = {
     "tts_rate": "+20%",
     "ai_mode": "direct",              # direct, clean, smart
     "gemini_api_key": "",
-    "gemma_model": "gemma-4-31b-it",
-    "gemini_model": "gemini-2.5-flash",
+    "gemma_model": "gemini-3.5-flash-lite",
+    "gemini_model": "gemini-3.6-flash",
     "system_prompt_clean": "",
     "system_prompt_smart": ""
 }

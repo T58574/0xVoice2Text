@@ -423,7 +423,7 @@ class SettingsDialog(QDialog):
         lbl_clean_m = QLabel("Clean модель (Gemma/Lite):")
         self.combo_clean_model = QComboBox()
         self.combo_clean_model.addItem("Gemma 4 31B (14.4k RPD / 30 RPM)", "gemma-4-31b-it")
-        self.combo_clean_model.addItem("Gemma 4 26B (14.4k RPD / 30 RPM)", "gemma-4-26b-it")
+        self.combo_clean_model.addItem("Gemma 4 26B (14.4k RPD / 30 RPM)", "gemma-4-26b-a4b-it")
         self.combo_clean_model.addItem("Gemini 3.5 Flash Lite (500 RPD / 15 RPM)", "gemini-3.5-flash-lite")
         self.combo_clean_model.addItem("Gemini 3.1 Flash Lite (500 RPD / 15 RPM)", "gemini-3.1-flash-lite")
         
@@ -442,10 +442,10 @@ class SettingsDialog(QDialog):
         self.combo_smart_model = QComboBox()
         self.combo_smart_model.addItem("Gemini 3.6 Flash (20 RPD / 5 RPM)", "gemini-3.6-flash")
         self.combo_smart_model.addItem("Gemini 3.5 Flash (20 RPD / 5 RPM)", "gemini-3.5-flash")
-        self.combo_smart_model.addItem("Gemini 2.5 Flash (20 RPD / 5 RPM)", "gemini-2.5-flash")
-        self.combo_smart_model.addItem("Gemini 3 Flash (20 RPD / 5 RPM)", "gemini-3-flash")
+        self.combo_smart_model.addItem("Gemini 3.5 Flash Lite (500 RPD / 15 RPM)", "gemini-3.5-flash-lite")
+        self.combo_smart_model.addItem("Gemma 4 31B (14.4k RPD / 30 RPM)", "gemma-4-31b-it")
 
-        curr_gemini = self.config.get("gemini_model", "gemini-2.5-flash")
+        curr_gemini = self.config.get("gemini_model", "gemini-3.6-flash")
         gemini_idx = 0
         for i in range(self.combo_smart_model.count()):
             if self.combo_smart_model.itemData(i) == curr_gemini:
