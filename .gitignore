@@ -5,8 +5,6 @@
 Thumbs.db
 desktop.ini
 
-.parcel-cache/
-
 # --- IDE & EDITORS ---
 .idea/
 .vscode/
@@ -17,11 +15,7 @@ desktop.ini
 .pydevproject
 .settings/
 
-# --- NODE ---
-node_modules/
-node_modules
-
-# --- PYTHON CORE ---
+# --- PYTHON ---
 __pycache__/
 *.py[cod]
 *$py.class
@@ -30,82 +24,38 @@ __pycache__/
 *.egg
 *.egg-info/
 .eggs/
-eggs/
-develop-eggs/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/
-.mypy_cache/
-.dmypy.json
-dmypy.json
-.pyre/
-.ruff_cache/
-
-# --- ENVIRONMENTS & VENV ---
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-.python-version
-pip-log.txt
-
-# --- POETRY & DEPENDENCIES ---
-# (Poetry lockfile лучше держать в git, но папки виртуалок игнорим)
-.venv/
-bin/
-lib/
-lib64/
-include/
-
-__pycache__
-
-# --- BUILD & DIST ---
 build/
 dist/
 out/
-target/
 *.manifest
 *.spec
 
-# --- DATA, JUPYTER & MEDIA ---
-.ipynb_checkpoints
-profile_default/
-ipython_config.py
-*.mp4
-*.avi
-*.mov
-*.mkv
-*.webm
-*.csv
-*.jsonl
-*.sqlite3
-*.sqlite3-journal
+# --- ENVIRONMENTS & SECRETS ---
+.env
+.env.*
+*.env
+*.pem
+*.key
 
-# --- DOCKER & INFRA ---
-.docker/
-*.pid
-celerybeat-schedule
-# --- LOGS ---
+# --- USER DATA & HISTORY (PRIVATE - DO NOT COMMIT) ---
+data/history.json
+data/config.json
+data/audio_cache/
+data/*.json
+!data/config.example.json
+
+history.json
+config.json
+
+# --- AUDIO & MEDIA CACHE ---
+*.mp3
+*.wav
+*.m4a
+*.flac
+*.ogg
+
+# --- LOGS & IPC ---
 *.log
 logs/
-
-# --- APP CUSTOM ---
-go-server/dist/
-go-server/config/
-necro-geometry.exe
+events.log
+last_event.json
