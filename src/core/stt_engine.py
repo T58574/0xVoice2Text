@@ -6,6 +6,8 @@ import numpy as np
 from dotenv import load_dotenv
 from groq import Groq
 
+from src.core.logger import logger
+
 # Load environment variables from project root .env file
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ENV_PATH = os.path.join(BASE_DIR, ".env")
@@ -52,7 +54,7 @@ class STTEngine:
 
             api_key = self.get_api_key()
             if not api_key or api_key == "gsk_your_groq_api_key_here":
-                print("[STTEngine] Warning: GROQ_API_KEY is not set in .env file!")
+                logger.warning("[STTEngine] Warning: GROQ_API_KEY is not set in .env file!")
                 self.is_ready = False
                 self.status_message = "NO GROQ KEY IN .ENV"
             else:
@@ -60,9 +62,9 @@ class STTEngine:
                     self.client = Groq(api_key=api_key)
                     self.is_ready = True
                     self.status_message = "GROQ API READY"
-                    print("[STTEngine] Groq API client initialized successfully with 'whisper-large-v3'!")
+                    logger.info("[STTEngine] Groq API client initialized successfully with 'whisper-large-v3'!")
                 except Exception as e:
-                    print(f"[STTEngine] Error initializing Groq client: {e}")
+                    logger.error(f"[STTEngine] Error initializing Groq client: {e}", exc_info=True)
                     self.is_ready = False
                     self.status_message = "GROQ CLIENT ERR"
 
@@ -78,16 +80,16 @@ class STTEngine:
         """
         api_key = self.get_api_key()
         if not api_key or api_key == "gsk_your_groq_api_key_here":
-            print("[STTEngine] Error: GROQ_API_KEY missing from .env!")
-            return "ERROR: Add GROQ_API_KEY to .env file!"
+            logger.error("[STTEngine] Error: GROQ_API_KEY missing from .env!")
+            return "ERR: GROQ_KEY_MISSING"
 
         if self.client is None:
             try:
                 self.client = Groq(api_key=api_key)
                 self.is_ready = True
             except Exception as e:
-                print(f"[STTEngine] Failed to create Groq client: {e}")
-                return ""
+                logger.error(f"[STTEngine] Failed to create Groq client: {e}", exc_info=True)
+                return f"ERR: GROQ_INIT_FAILED ({e})"
 
         if audio_data is None or len(audio_data) < 1600:
             return ""
@@ -97,7 +99,7 @@ class STTEngine:
             t0 = time.time()
             wav_file = numpy_to_wav_bytes(audio_data, sample_rate=16000)
 
-            print(f"[STTEngine] Sending audio ({len(audio_data)/16000:.2f}s) to Groq Cloud API (whisper-large-v3)...")
+            logger.info(f"[STTEngine] Sending audio ({len(audio_data)/16000:.2f}s) to Groq Cloud API (whisper-large-v3)...")
 
             kwargs = {
                 "file": ("speech.wav", wav_file.read()),
@@ -113,14 +115,14 @@ class STTEngine:
             # Response is string if response_format="text"
             text = str(response).strip() if response else ""
             dt = time.time() - t0
-            print(f"[STTEngine] [Groq Cloud] Transcribed in {dt:.3f}s: '{text}'")
+            logger.info(f"[STTEngine] [Groq Cloud] Transcribed in {dt:.3f}s: '{text}'")
             return text
         except Exception as e:
-            print(f"[STTEngine] Groq API transcription error: {e}")
+            logger.error(f"[STTEngine] Groq API transcription error: {e}", exc_info=True)
             err_msg = str(e)
             if "api_key" in err_msg.lower() or "401" in err_msg:
-                return "ERR: Invalid GROQ_API_KEY in .env"
-            return ""
+                return "ERR: GROQ_401_UNAUTHORIZED"
+            return f"ERR: GROQ_API_ERROR ({err_msg})"
 
     def change_model(self, model_size="whisper-large-v3", language="ru", device="cloud", on_complete=None):
         self.language = language if language != "auto" else None

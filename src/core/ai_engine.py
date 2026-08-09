@@ -3,6 +3,7 @@ import json
 import urllib.request
 import urllib.error
 from dotenv import load_dotenv
+from src.core.logger import logger
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ENV_PATH = os.path.join(BASE_DIR, ".env")
@@ -51,26 +52,27 @@ class AIEngine:
             key = self.config.get("gemini_api_key", "").strip()
         return key
 
-    def process_text(self, raw_text: str, mode: str = "direct") -> str:
+    def process_text(self, raw_text: str, mode: str = "direct") -> tuple[str, str]:
         """
-        Processes transcribed text based on active AI mode:
-        - direct: returns raw_text unchanged.
-        - clean: uses Gemma 4 / Gemini Flash Lite to clean speech filler & punctuation.
-        - smart: uses Gemini 3.5/3.6 Flash for intelligent commands & transformation.
+        Processes transcribed text based on active AI mode.
+        Returns tuple: (processed_text, error_message).
+        - If error occurs: processed_text is raw_text, error_message describes failure.
+        - If success: error_message is empty string "".
         """
         if not raw_text or mode == "direct":
-            return raw_text
+            return (raw_text, "")
 
         api_key = self.get_api_key()
         if not api_key:
-            print("[AIEngine] Warning: GEMINI_API_KEY / GOOGLE_API_KEY not found in .env or config!")
-            return raw_text
+            err_msg = "GEMINI_KEY_MISSING: API-ключ Gemini не найден в .env (GEMINI_API_KEY) или настройках приложения."
+            logger.warning(f"[AIEngine] {err_msg}")
+            return (raw_text, err_msg)
 
         model_name = self.config.get("gemma_model", "gemma-4-31b-it") if mode == "clean" else self.config.get("gemini_model", "gemini-2.5-flash")
         system_prompt = self.config.get("system_prompt_clean", DEFAULT_CLEAN_PROMPT) if mode == "clean" else self.config.get("system_prompt_smart", DEFAULT_SMART_PROMPT)
 
         try:
-            print(f"[AIEngine] Requesting [{mode.upper()}] via model '{model_name}'...")
+            logger.info(f"[AIEngine] Requesting [{mode.upper()}] via Google API model '{model_name}'...")
             processed = self._call_gemini_api(
                 api_key=api_key,
                 model_name=model_name,
@@ -78,12 +80,22 @@ class AIEngine:
                 user_text=raw_text
             )
             if processed and processed.strip():
-                print(f"[AIEngine] [{mode.upper()} Result]: '{processed.strip()}'")
-                return processed.strip()
-            return raw_text
+                logger.info(f"[AIEngine] [{mode.upper()} Success]: '{processed.strip()}'")
+                return (processed.strip(), "")
+            return (raw_text, "EMPTY_RESPONSE: Модель не вернула текстуального ответа.")
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode("utf-8", errors="ignore") if hasattr(e, "read") else str(e)
+            err_msg = f"GOOGLE_API_HTTP_ERROR {e.code} ({e.reason}):\n{err_body}"
+            logger.error(f"[AIEngine] HTTP Exception in mode {mode}: {err_msg}", exc_info=True)
+            return (raw_text, err_msg)
+        except urllib.error.URLError as e:
+            err_msg = f"NETWORK_ERROR: Не удалось подключиться к серверам Google Gemini API: {e.reason}"
+            logger.error(f"[AIEngine] Network Exception in mode {mode}: {err_msg}", exc_info=True)
+            return (raw_text, err_msg)
         except Exception as e:
-            print(f"[AIEngine] Error during AI post-processing ({mode}): {e}")
-            return raw_text
+            err_msg = f"UNEXPECTED_AI_ERROR: {str(e)}"
+            logger.error(f"[AIEngine] Unexpected Exception in mode {mode}: {err_msg}", exc_info=True)
+            return (raw_text, err_msg)
 
     def _call_gemini_api(self, api_key: str, model_name: str, system_prompt: str, user_text: str) -> str:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"

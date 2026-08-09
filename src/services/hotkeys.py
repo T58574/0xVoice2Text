@@ -1,6 +1,7 @@
 from pynput import keyboard
 import threading
 import time
+from src.core.logger import logger
 
 class HotkeyManager:
     def __init__(self, target_key="ctrl+space", mode="toggle", on_start=None, on_stop=None):

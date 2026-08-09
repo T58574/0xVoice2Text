@@ -27,19 +27,20 @@ from src.services.hotkeys import HotkeyManager
 from src.services.macros import MacroManager
 from src.services.injector import TextInjector
 from src.services.tts import JarvisVoiceService
-import src.services.sounds as sound_effects
-
+from src.core.logger import logger
 from src.ui.widget import DesktopWidget
 from src.ui.settings import SettingsDialog
 from src.ui.history import HistoryWindow
 from src.ui.mouse_hud import MouseHUDOverlay
 from src.ui.tray import SystemTrayApp
+from src.ui.error_dialog import ErrorNotificationDialog
 
 class SignalBridge(QObject):
     recording_started = pyqtSignal()
     recording_stopped = pyqtSignal()
     transcription_done = pyqtSignal(str)
     ai_done = pyqtSignal(str)
+    ai_error = pyqtSignal(str)
     model_loaded = pyqtSignal(bool)
 
 class ApplicationController:
@@ -86,6 +87,7 @@ class ApplicationController:
         self.bridge.recording_stopped.connect(self._on_ui_recording_stopped)
         self.bridge.transcription_done.connect(self._on_ui_transcription_done)
         self.bridge.ai_done.connect(self._finalize_text_injection)
+        self.bridge.ai_error.connect(self._on_ai_error)
         self.bridge.model_loaded.connect(self._on_model_loaded)
 
         # Hotkey Manager
@@ -171,8 +173,13 @@ class ApplicationController:
     def _on_ui_transcription_done(self, text):
         self.is_transcribing = False
         if not text or text.startswith("ERR") or text.startswith("ERROR"):
-            self.widget.set_state_idle("ERR: GROQ KEY")
+            self.widget.set_state_idle("ERR: GROQ")
             self.tts.play_category("error")
+            self.show_error_dialog(
+                title="Ошибка Groq Cloud API",
+                error_msg=text if text else "Неизвестная ошибка распознавания речи Groq API.",
+                solution_hint="Проверьте правильность GROQ_API_KEY в файле .env или подключение к интернету."
+            )
             return
 
         # Clean trailing stop words if present
@@ -183,7 +190,7 @@ class ApplicationController:
 
         # Ignore self-echo of Jarvis's own TTS response phrases
         if self.tts.is_jarvis_phrase(text):
-            print(f"[Main] 🛡️ Filtered out self-echo Jarvis voice phrase: '{text}'")
+            logger.info(f"[Main] 🛡️ Filtered out self-echo Jarvis voice phrase: '{text}'")
             self.widget.set_state_idle("READY")
             return
 
@@ -211,11 +218,36 @@ class ApplicationController:
         if ai_mode in ("clean", "smart"):
             self.widget.set_state_ai_thinking(ai_mode)
             def _ai_worker():
-                processed_text = self.ai_engine.process_text(text, mode=ai_mode)
-                self.bridge.ai_done.emit(processed_text)
+                processed_text, err_msg = self.ai_engine.process_text(text, mode=ai_mode)
+                if err_msg:
+                    self.bridge.ai_error.emit(err_msg)
+                    # Also fallback to injecting raw transcript if available
+                    self.bridge.ai_done.emit(processed_text)
+                else:
+                    self.bridge.ai_done.emit(processed_text)
             threading.Thread(target=_ai_worker, daemon=True).start()
         else:
             self._finalize_text_injection(text)
+
+    def _on_ai_error(self, err_msg: str):
+        self.widget.set_state_idle("ERR: GEMINI")
+        self.tts.play_category("error")
+        self.show_error_dialog(
+            title="Ошибка Google Gemini / Gemma API",
+            error_msg=err_msg,
+            solution_hint="Укажите действительный GEMINI_API_KEY в файле .env или переключите модель/режим в настройках."
+        )
+
+    def show_error_dialog(self, title: str, error_msg: str, solution_hint: str = ""):
+        logger.error(f"[Main] Showing Error Dialog: {title} | Details: {error_msg}")
+        dialog = ErrorNotificationDialog(
+            title=title,
+            error_msg=error_msg,
+            solution_hint=solution_hint,
+            parent=self.widget
+        )
+        dialog.open_settings_requested.connect(self.open_settings)
+        dialog.exec()
 
     def _finalize_text_injection(self, text: str):
         if not text:
