@@ -338,12 +338,16 @@ class SettingsDialog(QDialog):
         self.chk_sound = QCheckBox("Звуковые эффекты старта / стопа записи")
         self.chk_sound.setChecked(self.config.get("sound_feedback", True))
 
+        self.chk_tts_voice = QCheckBox("Голосовые ответы ассистента (Джарвис TTS)")
+        self.chk_tts_voice.setChecked(self.config.get("tts_voice_enabled", True))
+
         self.chk_ontop = QCheckBox("Поверх всех окон (Закрепить виджет)")
         self.chk_ontop.setChecked(self.config.get("always_on_top", True))
 
         sys_layout.addWidget(self.chk_auto_paste)
         sys_layout.addWidget(self.chk_trailing_space)
         sys_layout.addWidget(self.chk_sound)
+        sys_layout.addWidget(self.chk_tts_voice)
         sys_layout.addWidget(self.chk_ontop)
         sys_group.setLayout(sys_layout)
         opts_main_layout.addWidget(sys_group)
@@ -390,6 +394,7 @@ class SettingsDialog(QDialog):
         self.config.set("auto_paste", self.chk_auto_paste.isChecked())
         self.config.set("add_trailing_space", self.chk_trailing_space.isChecked())
         self.config.set("sound_feedback", self.chk_sound.isChecked())
+        self.config.set("tts_voice_enabled", self.chk_tts_voice.isChecked())
         self.config.set("always_on_top", self.chk_ontop.isChecked())
 
         if self.on_save_callback:

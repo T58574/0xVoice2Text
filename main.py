@@ -25,6 +25,7 @@ from src.core.ipc_bus import IPCEventBus
 from src.services.hotkeys import HotkeyManager
 from src.services.macros import MacroManager
 from src.services.injector import TextInjector
+from src.services.tts import JarvisVoiceService
 import src.services.sounds as sound_effects
 
 from src.ui.widget import DesktopWidget
@@ -47,10 +48,12 @@ class ApplicationController:
         self.config = AppConfig()
         self.history_mgr = HistoryManager()
         self.ipc = IPCEventBus()
+        self.tts = JarvisVoiceService(self.config)
         self.bridge = SignalBridge()
 
         # Audio Recorder
         self.recorder = AudioRecorder(device_id=self.config.get("audio_device"))
+        self.recorder.set_tts_speaking_checker(self.tts.is_speaking)
 
         # STT Engine
         self.stt = STTEngine(
@@ -140,6 +143,7 @@ class ApplicationController:
 
         if self.config.get("sound_feedback", True):
             sound_effects.play_start_sound()
+            self.tts.play_category("listening")
         self.widget.set_state_recording()
         self.recorder.start_recording()
 
@@ -168,11 +172,18 @@ class ApplicationController:
         self.is_transcribing = False
         if not text or text.startswith("ERR") or text.startswith("ERROR"):
             self.widget.set_state_idle("ERR: GROQ KEY")
+            self.tts.play_category("error")
             return
 
         # Clean trailing stop words if present
         text = self.wake_mgr.clean_transcription(text)
         if not text:
+            self.widget.set_state_idle("READY")
+            return
+
+        # Ignore self-echo of Jarvis's own TTS response phrases
+        if self.tts.is_jarvis_phrase(text):
+            print(f"[Main] 🛡️ Filtered out self-echo Jarvis voice phrase: '{text}'")
             self.widget.set_state_idle("READY")
             return
 
@@ -191,6 +202,7 @@ class ApplicationController:
 
             if self.config.get("sound_feedback", True):
                 sound_effects.play_success_sound()
+                self.tts.play_category("macro")
 
             self.widget.set_state_inserted(f"⚡ {macro_desc}")
             return
@@ -215,6 +227,7 @@ class ApplicationController:
             )
             if success and self.config.get("sound_feedback", True):
                 sound_effects.play_success_sound()
+                self.tts.play_category("success")
 
         self.widget.set_state_inserted(text)
 

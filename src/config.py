@@ -24,7 +24,11 @@ DEFAULT_CONFIG = {
     "sound_feedback": True,
     "always_on_top": True,
     "widget_opacity": 0.92,
-    "theme": "cyberpunk_dark"
+    "theme": "cyberpunk_dark",
+    "tts_voice_enabled": True,
+    "tts_voice": "ru-RU-DmitryNeural",
+    "tts_pitch": "-5Hz",
+    "tts_rate": "+0%"
 }
 
 class AppConfig:
