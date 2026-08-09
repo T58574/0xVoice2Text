@@ -20,7 +20,6 @@ DEFAULT_CONFIG = {
     "add_trailing_space": True,
     "sound_feedback": True,
     "always_on_top": True,
-    "widget_position": {"x": 100, "y": 100},
     "widget_opacity": 0.92,
     "theme": "cyberpunk_dark"
 }

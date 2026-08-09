@@ -61,6 +61,9 @@ class SystemTrayApp:
         action_history = menu.addAction("📜 ИСТОРИЯ ЗАПРОСОВ")
         action_history.triggered.connect(self.on_open_history)
 
+        action_center = menu.addAction("🎯 ЦЕНТРИРОВАТЬ ВИДЖЕТ")
+        action_center.triggered.connect(self.center_widget)
+
         action_toggle = menu.addAction("👁 TOGGLE WIDGET")
         action_toggle.triggered.connect(self.toggle_widget)
 
@@ -75,6 +78,13 @@ class SystemTrayApp:
         self.tray.setContextMenu(menu)
         self.tray.activated.connect(self.on_tray_activated)
         self.tray.show()
+
+    def center_widget(self):
+        if hasattr(self.widget, 'center_on_screen'):
+            self.widget.center_on_screen()
+        self.widget.show()
+        self.widget.raise_()
+        self.widget.activateWindow()
 
     def toggle_widget(self):
         if self.widget.isVisible():

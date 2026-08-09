@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (
-    QWidget, QLabel, QHBoxLayout, QVBoxLayout, QPushButton,
+    QApplication, QWidget, QLabel, QHBoxLayout, QVBoxLayout, QPushButton,
     QFrame, QGraphicsDropShadowEffect, QScrollArea, QListWidget, QListWidgetItem
 )
 from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal, QSize
@@ -226,6 +226,7 @@ class DesktopWidget(QWidget):
 
         self.init_window_flags()
         self.init_ui()
+        self.center_on_screen()
 
         self.timer = QTimer(self)
         self.timer.setInterval(16)
@@ -236,8 +237,13 @@ class DesktopWidget(QWidget):
         self.setWindowFlags(flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        pos = self.config.get("widget_position", {"x": 100, "y": 100})
-        self.move(pos.get("x", 100), pos.get("y", 100))
+    def center_on_screen(self):
+        screen = QApplication.primaryScreen()
+        if screen:
+            screen_geometry = screen.availableGeometry()
+            frame_geo = self.frameGeometry()
+            frame_geo.moveCenter(screen_geometry.center())
+            self.move(frame_geo.topLeft())
 
     def init_ui(self):
         self.setFixedWidth(320)
@@ -462,6 +468,4 @@ class DesktopWidget(QWidget):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and self.is_dragging:
             self.is_dragging = False
-            new_pos = {"x": self.x(), "y": self.y()}
-            self.config.set("widget_position", new_pos)
             event.accept()
