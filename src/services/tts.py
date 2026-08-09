@@ -60,6 +60,7 @@ class JarvisVoiceService:
     Modular plug-and-play Text-to-Speech (TTS) Service for Jarvis.
     - Zero lock-in: toggle on/off in config via 'tts_voice_enabled' (default: True).
     - Female (Svetlana) & Male (Dmitry) voice selection + configurable speech speed (+20%).
+    - Automatic startup background pre-caching for 0ms instant local playback.
     - Native Windows MCI MP3 playback via ctypes (0 extra dependencies).
     - Echo prevention tracking via is_speaking() & is_jarvis_phrase().
     """
@@ -70,6 +71,9 @@ class JarvisVoiceService:
         self.current_alias = None
         self.is_speaking_flag = False
         os.makedirs(self.cache_dir, exist_ok=True)
+        
+        # Start silent background pre-caching of all voice phrases on startup
+        self.start_background_precaching()
 
     def is_enabled(self) -> bool:
         return bool(self.config.get("tts_voice_enabled", True))
@@ -87,6 +91,36 @@ class JarvisVoiceService:
                 if p_norm in norm_text or norm_text in p_norm:
                     return True
         return False
+
+    def start_background_precaching(self):
+        """
+        Pre-caches all phrase variations in the background on startup
+        so all phrases play with 0ms lag from local disk cache.
+        """
+        def _precache_worker():
+            try:
+                import edge_tts
+                voices = [
+                    ("ru-RU-SvetlanaNeural", "+0Hz"),
+                    ("ru-RU-DmitryNeural", "-5Hz")
+                ]
+                rate = self.config.get("tts_rate", "+20%")
+
+                for voice, pitch in voices:
+                    for cat_phrases in PRESET_PHRASES.values():
+                        for phrase in cat_phrases:
+                            fname = get_phrase_filename(phrase, voice, rate)
+                            fpath = os.path.join(self.cache_dir, fname)
+                            if not os.path.exists(fpath):
+                                try:
+                                    comm = edge_tts.Communicate(phrase, voice=voice, pitch=pitch, rate=rate)
+                                    asyncio.run(comm.save(fpath))
+                                except Exception:
+                                    pass
+            except Exception as e:
+                print(f"[JarvisVoiceService] Pre-caching exception: {e}")
+
+        threading.Thread(target=_precache_worker, daemon=True).start()
 
     def _play_mp3_file(self, mp3_path: str):
         if not os.path.exists(mp3_path):
