@@ -215,6 +215,7 @@ class CyberpunkHistoryDrawer(QFrame):
 class DesktopWidget(QWidget):
     open_settings_signal = pyqtSignal()
     reinject_text_signal = pyqtSignal(str)
+    ai_mode_changed_signal = pyqtSignal(str)
 
     def __init__(self, config, history_mgr=None):
         super().__init__()
@@ -246,7 +247,7 @@ class DesktopWidget(QWidget):
             self.move(frame_geo.topLeft())
 
     def init_ui(self):
-        self.setFixedWidth(320)
+        self.setFixedWidth(350)
         self.setFixedHeight(70)
 
         main_v_layout = QVBoxLayout(self)
@@ -320,6 +321,10 @@ class DesktopWidget(QWidget):
             }
         """
 
+        self.btn_mode = QPushButton("DIRECT", self.main_frame)
+        self.btn_mode.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_mode.clicked.connect(self.cycle_ai_mode)
+
         self.btn_hist = QPushButton("HIST", self.main_frame)
         self.btn_hist.setStyleSheet(cyber_btn_style)
         self.btn_hist.setToolTip("История вводов")
@@ -338,10 +343,13 @@ class DesktopWidget(QWidget):
         self.btn_close.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.btn_close.clicked.connect(self.hide)
 
+        btn_layout.addWidget(self.btn_mode)
         btn_layout.addWidget(self.btn_hist)
         btn_layout.addWidget(self.btn_settings)
         btn_layout.addWidget(self.btn_close)
         layout.addLayout(btn_layout)
+
+        self.update_ai_mode_badge()
 
         main_v_layout.addWidget(self.main_frame)
 
@@ -402,6 +410,88 @@ class DesktopWidget(QWidget):
         hk = self.config.get('hotkey', 'ctrl+space').upper()
         mode = "PRESS" if self.config.get('hotkey_mode') == 'toggle' else "HOLD"
         self.lbl_hotkey.setText(f"{mode} [{hk}]")
+
+    def cycle_ai_mode(self):
+        modes = ["direct", "clean", "smart"]
+        curr = self.config.get("ai_mode", "direct")
+        idx = (modes.index(curr) + 1) % len(modes) if curr in modes else 0
+        new_mode = modes[idx]
+        self.config.set("ai_mode", new_mode)
+        self.update_ai_mode_badge()
+        self.ai_mode_changed_signal.emit(new_mode)
+
+    def update_ai_mode_badge(self):
+        mode = self.config.get("ai_mode", "direct")
+        if mode == "clean":
+            self.btn_mode.setText("✨ CLEAN")
+            self.btn_mode.setToolTip("Режим ИИ: Чистка устной речи (Gemma 4)")
+            self.btn_mode.setStyleSheet("""
+                QPushButton {
+                    background: #09090b;
+                    color: #38bdf8;
+                    border: 1px solid #38bdf8;
+                    font-family: 'Consolas', sans-serif;
+                    font-size: 10px;
+                    font-weight: bold;
+                    border-radius: 4px;
+                    padding: 3px 6px;
+                }
+                QPushButton:hover {
+                    background: #38bdf8;
+                    color: #000000;
+                }
+            """)
+        elif mode == "smart":
+            self.btn_mode.setText("🤖 SMART")
+            self.btn_mode.setToolTip("Режим ИИ: Умная команда/Рерайт (Gemini Flash)")
+            self.btn_mode.setStyleSheet("""
+                QPushButton {
+                    background: #09090b;
+                    color: #a855f7;
+                    border: 1px solid #a855f7;
+                    font-family: 'Consolas', sans-serif;
+                    font-size: 10px;
+                    font-weight: bold;
+                    border-radius: 4px;
+                    padding: 3px 6px;
+                }
+                QPushButton:hover {
+                    background: #a855f7;
+                    color: #000000;
+                }
+            """)
+        else:
+            self.btn_mode.setText("⚡ DIRECT")
+            self.btn_mode.setToolTip("Режим ИИ: Прямой быстрый ввод без ИИ")
+            self.btn_mode.setStyleSheet("""
+                QPushButton {
+                    background: #000000;
+                    color: #a1a1aa;
+                    border: 1px solid #27272a;
+                    font-family: 'Consolas', sans-serif;
+                    font-size: 10px;
+                    font-weight: bold;
+                    border-radius: 4px;
+                    padding: 3px 6px;
+                }
+                QPushButton:hover {
+                    background: #ffffff;
+                    color: #000000;
+                    border-color: #ffffff;
+                }
+            """)
+
+    def set_state_ai_thinking(self, mode_name="AI"):
+        self.visualizer.set_state("transcribing")
+        self.lbl_status.setText(f"🤖 {mode_name.upper()}...")
+        self.lbl_status.setStyleSheet("color: #a855f7; font-weight: bold; border: none; background: transparent;")
+        self.main_frame.setStyleSheet("""
+            QFrame {
+                background: #000000;
+                border: 1.5px solid #a855f7;
+                border-radius: 14px;
+            }
+        """)
 
     def set_state_idle(self, message="READY"):
         self.visualizer.set_state("idle")

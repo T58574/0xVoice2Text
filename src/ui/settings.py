@@ -378,6 +378,91 @@ class SettingsDialog(QDialog):
 
         self.tabs.addTab(tab_options, "⌨️ КЛАВИШИ И ПОВЕДЕНИЕ")
 
+        # TAB 3: AI POST-PROCESSING (🤖 GEMINI / GEMMA)
+        tab_ai = QWidget()
+        ai_main_layout = QVBoxLayout(tab_ai)
+        ai_main_layout.setSpacing(10)
+
+        ai_mode_group = QGroupBox("РЕЖИМ ОБРАБОТКИ ИИ")
+        ai_mode_layout = QVBoxLayout()
+        ai_mode_layout.setSpacing(8)
+
+        self.combo_ai_mode = QComboBox()
+        self.combo_ai_mode.addItem("⚡ DIRECT (Прямой ввод Whisper без ИИ)", "direct")
+        self.combo_ai_mode.addItem("✨ CLEAN (Чистка устной речи — Gemma 4 / Flash Lite)", "clean")
+        self.combo_ai_mode.addItem("🤖 SMART (Умная команда / Рерайт — Gemini Flash)", "smart")
+        
+        curr_ai_mode = self.config.get("ai_mode", "direct")
+        mode_idx = 0 if curr_ai_mode == "direct" else (1 if curr_ai_mode == "clean" else 2)
+        self.combo_ai_mode.setCurrentIndex(mode_idx)
+        ai_mode_layout.addWidget(self.combo_ai_mode)
+        ai_mode_group.setLayout(ai_mode_layout)
+        ai_main_layout.addWidget(ai_mode_group)
+
+        # API Key Group
+        api_group = QGroupBox("GOOGLE GEMINI API KEY")
+        api_layout = QVBoxLayout()
+        self.txt_gemini_key = QLineEdit()
+        self.txt_gemini_key.setEchoMode(QLineEdit.EchoMode.PasswordEchoOnEdit)
+        self.txt_gemini_key.setText(self.config.get("gemini_api_key", ""))
+        self.txt_gemini_key.setPlaceholderText("Ключ из Google AI Studio (или добавьте GEMINI_API_KEY в .env)")
+        lbl_api_hint = QLabel("💡 Ключ также автоматически подхватывается из файла .env (GEMINI_API_KEY)")
+        lbl_api_hint.setFont(QFont("Consolas", 8))
+        lbl_api_hint.setStyleSheet("color: #71717a;")
+        api_layout.addWidget(self.txt_gemini_key)
+        api_layout.addWidget(lbl_api_hint)
+        api_group.setLayout(api_layout)
+        ai_main_layout.addWidget(api_group)
+
+        # Models Group
+        models_group = QGroupBox("ВЫБОР МОДЕЛЕЙ ИИ")
+        models_layout = QVBoxLayout()
+        models_layout.setSpacing(8)
+
+        clean_m_layout = QHBoxLayout()
+        lbl_clean_m = QLabel("Clean модель (Gemma/Lite):")
+        self.combo_clean_model = QComboBox()
+        self.combo_clean_model.addItem("Gemma 4 31B (14.4k RPD / 30 RPM)", "gemma-4-31b-it")
+        self.combo_clean_model.addItem("Gemma 4 26B (14.4k RPD / 30 RPM)", "gemma-4-26b-it")
+        self.combo_clean_model.addItem("Gemini 3.5 Flash Lite (500 RPD / 15 RPM)", "gemini-3.5-flash-lite")
+        self.combo_clean_model.addItem("Gemini 3.1 Flash Lite (500 RPD / 15 RPM)", "gemini-3.1-flash-lite")
+        
+        curr_gemma = self.config.get("gemma_model", "gemma-4-31b-it")
+        gemma_idx = 0
+        for i in range(self.combo_clean_model.count()):
+            if self.combo_clean_model.itemData(i) == curr_gemma:
+                gemma_idx = i
+                break
+        self.combo_clean_model.setCurrentIndex(gemma_idx)
+        clean_m_layout.addWidget(lbl_clean_m)
+        clean_m_layout.addWidget(self.combo_clean_model)
+
+        smart_m_layout = QHBoxLayout()
+        lbl_smart_m = QLabel("Smart модель (Gemini Flash):")
+        self.combo_smart_model = QComboBox()
+        self.combo_smart_model.addItem("Gemini 3.6 Flash (20 RPD / 5 RPM)", "gemini-3.6-flash")
+        self.combo_smart_model.addItem("Gemini 3.5 Flash (20 RPD / 5 RPM)", "gemini-3.5-flash")
+        self.combo_smart_model.addItem("Gemini 2.5 Flash (20 RPD / 5 RPM)", "gemini-2.5-flash")
+        self.combo_smart_model.addItem("Gemini 3 Flash (20 RPD / 5 RPM)", "gemini-3-flash")
+
+        curr_gemini = self.config.get("gemini_model", "gemini-2.5-flash")
+        gemini_idx = 0
+        for i in range(self.combo_smart_model.count()):
+            if self.combo_smart_model.itemData(i) == curr_gemini:
+                gemini_idx = i
+                break
+        self.combo_smart_model.setCurrentIndex(gemini_idx)
+        smart_m_layout.addWidget(lbl_smart_m)
+        smart_m_layout.addWidget(self.combo_smart_model)
+
+        models_layout.addLayout(clean_m_layout)
+        models_layout.addLayout(smart_m_layout)
+        models_group.setLayout(models_layout)
+        ai_main_layout.addWidget(models_group)
+        ai_main_layout.addStretch()
+
+        self.tabs.addTab(tab_ai, "🤖 ИИ (GEMINI / GEMMA)")
+
         main_layout.addWidget(self.tabs)
 
         # Buttons (SAVE / CANCEL)
@@ -421,6 +506,12 @@ class SettingsDialog(QDialog):
         self.config.set("tts_voice", self.combo_tts_voice.currentData())
         self.config.set("tts_rate", self.combo_tts_rate.currentData())
         self.config.set("always_on_top", self.chk_ontop.isChecked())
+
+        # Save AI Settings
+        self.config.set("ai_mode", self.combo_ai_mode.currentData())
+        self.config.set("gemini_api_key", self.txt_gemini_key.text().strip())
+        self.config.set("gemma_model", self.combo_clean_model.currentData())
+        self.config.set("gemini_model", self.combo_smart_model.currentData())
 
         if self.on_save_callback:
             self.on_save_callback()

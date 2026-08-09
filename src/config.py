@@ -28,7 +28,13 @@ DEFAULT_CONFIG = {
     "tts_voice_enabled": True,
     "tts_voice": "ru-RU-SvetlanaNeural",
     "tts_pitch": "+0Hz",
-    "tts_rate": "+20%"
+    "tts_rate": "+20%",
+    "ai_mode": "direct",              # direct, clean, smart
+    "gemini_api_key": "",
+    "gemma_model": "gemma-4-31b-it",
+    "gemini_model": "gemini-2.5-flash",
+    "system_prompt_clean": "",
+    "system_prompt_smart": ""
 }
 
 class AppConfig:

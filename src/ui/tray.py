@@ -67,6 +67,18 @@ class SystemTrayApp:
         action_toggle = menu.addAction("👁 TOGGLE WIDGET")
         action_toggle.triggered.connect(self.toggle_widget)
 
+        # AI Mode Submenu
+        ai_menu = menu.addMenu("🤖 РЕЖИМ ИИ")
+        ai_menu.setStyleSheet(menu.styleSheet())
+        
+        act_direct = ai_menu.addAction("⚡ DIRECT (Без ИИ)")
+        act_clean = ai_menu.addAction("✨ CLEAN (Чистка — Gemma 4)")
+        act_smart = ai_menu.addAction("🤖 SMART (Команды — Gemini Flash)")
+
+        act_direct.triggered.connect(lambda: self.set_ai_mode("direct"))
+        act_clean.triggered.connect(lambda: self.set_ai_mode("clean"))
+        act_smart.triggered.connect(lambda: self.set_ai_mode("smart"))
+
         action_settings = menu.addAction("⚙ CONFIGURATION")
         action_settings.triggered.connect(self.on_open_settings)
 
@@ -93,6 +105,12 @@ class SystemTrayApp:
             self.widget.show()
             self.widget.raise_()
             self.widget.activateWindow()
+
+    def set_ai_mode(self, mode: str):
+        if hasattr(self.widget, 'config'):
+            self.widget.config.set("ai_mode", mode)
+        if hasattr(self.widget, 'update_ai_mode_badge'):
+            self.widget.update_ai_mode_badge()
 
     def on_tray_activated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.Trigger or reason == QSystemTrayIcon.ActivationReason.DoubleClick:

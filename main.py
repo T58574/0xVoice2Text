@@ -19,6 +19,7 @@ from src.config import AppConfig
 from src.core.history import HistoryManager
 from src.core.audio_recorder import AudioRecorder
 from src.core.stt_engine import STTEngine
+from src.core.ai_engine import AIEngine
 from src.core.wake_word import WakeWordManager
 from src.core.ipc_bus import IPCEventBus
 
@@ -38,6 +39,7 @@ class SignalBridge(QObject):
     recording_started = pyqtSignal()
     recording_stopped = pyqtSignal()
     transcription_done = pyqtSignal(str)
+    ai_done = pyqtSignal(str)
     model_loaded = pyqtSignal(bool)
 
 class ApplicationController:
@@ -55,12 +57,13 @@ class ApplicationController:
         self.recorder = AudioRecorder(device_id=self.config.get("audio_device"))
         self.recorder.set_tts_speaking_checker(self.tts.is_speaking)
 
-        # STT Engine
+        # STT & AI Engine
         self.stt = STTEngine(
             model_size="whisper-large-v3",
             language=self.config.get("language", "ru"),
             device="cloud"
         )
+        self.ai_engine = AIEngine(self.config)
 
         # Mouse Cursor Holographic HUD Overlay
         self.mouse_hud = MouseHUDOverlay()
@@ -82,6 +85,7 @@ class ApplicationController:
         self.bridge.recording_started.connect(self._on_ui_recording_started)
         self.bridge.recording_stopped.connect(self._on_ui_recording_stopped)
         self.bridge.transcription_done.connect(self._on_ui_transcription_done)
+        self.bridge.ai_done.connect(self._finalize_text_injection)
         self.bridge.model_loaded.connect(self._on_model_loaded)
 
         # Hotkey Manager
@@ -200,6 +204,22 @@ class ApplicationController:
                 self.tts.play_category("macro")
 
             self.widget.set_state_inserted(f"⚡ {macro_desc}")
+            return
+
+        # Check AI Processing Mode
+        ai_mode = self.config.get("ai_mode", "direct")
+        if ai_mode in ("clean", "smart"):
+            self.widget.set_state_ai_thinking(ai_mode)
+            def _ai_worker():
+                processed_text = self.ai_engine.process_text(text, mode=ai_mode)
+                self.bridge.ai_done.emit(processed_text)
+            threading.Thread(target=_ai_worker, daemon=True).start()
+        else:
+            self._finalize_text_injection(text)
+
+    def _finalize_text_injection(self, text: str):
+        if not text:
+            self.widget.set_state_idle("READY")
             return
 
         # 1. Save to History Manager
