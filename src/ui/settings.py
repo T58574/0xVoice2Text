@@ -341,6 +341,28 @@ class SettingsDialog(QDialog):
         self.chk_tts_voice = QCheckBox("Голосовые ответы ассистента (Джарвис TTS)")
         self.chk_tts_voice.setChecked(self.config.get("tts_voice_enabled", True))
 
+        tts_h_layout = QHBoxLayout()
+        lbl_tts_voice = QLabel("Голос:")
+        self.combo_tts_voice = QComboBox()
+        self.combo_tts_voice.addItem("Светлана (Женский)", "ru-RU-SvetlanaNeural")
+        self.combo_tts_voice.addItem("Дмитрий (Мужской)", "ru-RU-DmitryNeural")
+        curr_tts_v = self.config.get("tts_voice", "ru-RU-SvetlanaNeural")
+        self.combo_tts_voice.setCurrentIndex(1 if "Dmitry" in str(curr_tts_v) else 0)
+
+        lbl_tts_rate = QLabel("Скорость:")
+        self.combo_tts_rate = QComboBox()
+        self.combo_tts_rate.addItem("Нормальная (0%)", "+0%")
+        self.combo_tts_rate.addItem("Быстрая (+20%)", "+20%")
+        self.combo_tts_rate.addItem("Очень быстрая (+35%)", "+35%")
+        curr_tts_r = self.config.get("tts_rate", "+20%")
+        r_idx = 1 if curr_tts_r == "+20%" else (2 if curr_tts_r == "+35%" else 0)
+        self.combo_tts_rate.setCurrentIndex(r_idx)
+
+        tts_h_layout.addWidget(lbl_tts_voice)
+        tts_h_layout.addWidget(self.combo_tts_voice)
+        tts_h_layout.addWidget(lbl_tts_rate)
+        tts_h_layout.addWidget(self.combo_tts_rate)
+
         self.chk_ontop = QCheckBox("Поверх всех окон (Закрепить виджет)")
         self.chk_ontop.setChecked(self.config.get("always_on_top", True))
 
@@ -348,6 +370,7 @@ class SettingsDialog(QDialog):
         sys_layout.addWidget(self.chk_trailing_space)
         sys_layout.addWidget(self.chk_sound)
         sys_layout.addWidget(self.chk_tts_voice)
+        sys_layout.addLayout(tts_h_layout)
         sys_layout.addWidget(self.chk_ontop)
         sys_group.setLayout(sys_layout)
         opts_main_layout.addWidget(sys_group)
@@ -395,6 +418,8 @@ class SettingsDialog(QDialog):
         self.config.set("add_trailing_space", self.chk_trailing_space.isChecked())
         self.config.set("sound_feedback", self.chk_sound.isChecked())
         self.config.set("tts_voice_enabled", self.chk_tts_voice.isChecked())
+        self.config.set("tts_voice", self.combo_tts_voice.currentData())
+        self.config.set("tts_rate", self.combo_tts_rate.currentData())
         self.config.set("always_on_top", self.chk_ontop.isChecked())
 
         if self.on_save_callback:
