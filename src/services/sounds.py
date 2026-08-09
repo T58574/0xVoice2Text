@@ -2,7 +2,7 @@ import threading
 import numpy as np
 import sounddevice as sd
 
-CURRENT_SOUND_PACK = "scifi" # scifi, jarvis, stealth, disabled
+CURRENT_SOUND_PACK = "disabled" # Legacy synth bleeps disabled in favor of natural TTS voice
 
 def set_sound_pack(pack_name):
     global CURRENT_SOUND_PACK

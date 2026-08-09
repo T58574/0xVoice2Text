@@ -142,7 +142,6 @@ class ApplicationController:
         self.mouse_hud.trigger_around_cursor(duration_ms=1500)
 
         if self.config.get("sound_feedback", True):
-            sound_effects.play_start_sound()
             self.tts.play_category("listening")
         self.widget.set_state_recording()
         self.recorder.start_recording()
@@ -150,9 +149,6 @@ class ApplicationController:
     def _on_ui_recording_stopped(self):
         # Notify wake manager recording state
         self.wake_mgr.set_recording_state(False)
-
-        if self.config.get("sound_feedback", True):
-            sound_effects.play_stop_sound()
 
         audio_buffer = self.recorder.stop_recording()
         if audio_buffer is None or len(audio_buffer) < 1600:
@@ -201,7 +197,6 @@ class ApplicationController:
             )
 
             if self.config.get("sound_feedback", True):
-                sound_effects.play_success_sound()
                 self.tts.play_category("macro")
 
             self.widget.set_state_inserted(f"⚡ {macro_desc}")
@@ -226,7 +221,6 @@ class ApplicationController:
                 add_trailing_space=self.config.get("add_trailing_space", True)
             )
             if success and self.config.get("sound_feedback", True):
-                sound_effects.play_success_sound()
                 self.tts.play_category("success")
 
         self.widget.set_state_inserted(text)
@@ -238,7 +232,7 @@ class ApplicationController:
             add_trailing_space=self.config.get("add_trailing_space", True)
         )
         if success and self.config.get("sound_feedback", True):
-            sound_effects.play_success_sound()
+            self.tts.play_category("success")
         self.widget.set_state_inserted("PASTED")
 
     def open_history(self):
