@@ -1,7 +1,10 @@
 import os
 import json
 
-CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
+OLD_CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 
 DEFAULT_CONFIG = {
     "model_size": "whisper-large-v3",
@@ -27,12 +30,17 @@ DEFAULT_CONFIG = {
 class AppConfig:
     def __init__(self):
         self.data = DEFAULT_CONFIG.copy()
+        os.makedirs(DATA_DIR, exist_ok=True)
         self.load()
 
     def load(self):
-        if os.path.exists(CONFIG_FILE):
+        target_path = CONFIG_FILE
+        if not os.path.exists(CONFIG_FILE) and os.path.exists(OLD_CONFIG_FILE):
+            target_path = OLD_CONFIG_FILE
+
+        if os.path.exists(target_path):
             try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                with open(target_path, "r", encoding="utf-8") as f:
                     loaded = json.load(f)
                     self.data.update(loaded)
             except Exception as e:
@@ -40,6 +48,7 @@ class AppConfig:
 
     def save(self):
         try:
+            os.makedirs(DATA_DIR, exist_ok=True)
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(self.data, f, indent=4, ensure_ascii=False)
         except Exception as e:

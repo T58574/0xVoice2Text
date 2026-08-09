@@ -6,8 +6,9 @@ import numpy as np
 from dotenv import load_dotenv
 from groq import Groq
 
-# Load environment variables from .env file
-ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+# Load environment variables from project root .env file
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ENV_PATH = os.path.join(BASE_DIR, ".env")
 load_dotenv(ENV_PATH)
 
 def numpy_to_wav_bytes(audio_data: np.ndarray, sample_rate=16000) -> io.BytesIO:

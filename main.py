@@ -7,24 +7,31 @@ if hasattr(sys.stdout, 'reconfigure'):
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 
+# Add project root directory to sys.path
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import pyqtSignal, QObject
 
-from config import AppConfig
-from history_manager import HistoryManager
-from audio_recorder import AudioRecorder
-from stt_engine import STTEngine
-from hotkey_manager import HotkeyManager
-from text_injector import TextInjector
-from ui_widget import DesktopWidget
-from ui_settings import SettingsDialog
-from ui_history import HistoryWindow
-from ui_mouse_hud import MouseHUDOverlay
-from system_tray import SystemTrayApp
-from ipc_event_bus import IPCEventBus
-from wake_word_manager import WakeWordManager
-from macro_manager import MacroManager
-import sound_effects
+from src.config import AppConfig
+from src.core.history import HistoryManager
+from src.core.audio_recorder import AudioRecorder
+from src.core.stt_engine import STTEngine
+from src.core.wake_word import WakeWordManager
+from src.core.ipc_bus import IPCEventBus
+
+from src.services.hotkeys import HotkeyManager
+from src.services.macros import MacroManager
+from src.services.injector import TextInjector
+import src.services.sounds as sound_effects
+
+from src.ui.widget import DesktopWidget
+from src.ui.settings import SettingsDialog
+from src.ui.history import HistoryWindow
+from src.ui.mouse_hud import MouseHUDOverlay
+from src.ui.tray import SystemTrayApp
 
 class SignalBridge(QObject):
     recording_started = pyqtSignal()

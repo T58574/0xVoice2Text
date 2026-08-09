@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QCursor
-import audio_recorder
+from src.core.audio_recorder import get_input_devices
 
 class SettingsDialog(QDialog):
     def __init__(self, config, parent=None, on_save_callback=None):
@@ -223,7 +223,7 @@ class SettingsDialog(QDialog):
         audio_group = QGroupBox("ИСТОЧНИК ВВОДА ЗВУКА")
         audio_layout = QVBoxLayout()
         self.combo_mic = QComboBox()
-        self.devices = audio_recorder.get_input_devices()
+        self.devices = get_input_devices()
         
         self.combo_mic.addItem("DEFAULT SYSTEM MICROPHONE", None)
         current_device = self.config.get("audio_device")
