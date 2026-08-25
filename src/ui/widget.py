@@ -416,7 +416,10 @@ class DesktopWidget(QWidget):
         curr = self.config.get("ai_mode", "direct")
         idx = (modes.index(curr) + 1) % len(modes) if curr in modes else 0
         new_mode = modes[idx]
-        self.config.set("ai_mode", new_mode)
+        try:
+            self.config.set("ai_mode", new_mode)
+        except Exception as e:
+            print(f"[Widget] [WARN] Failed to persist AI mode change: {e}")
         self.update_ai_mode_badge()
         self.ai_mode_changed_signal.emit(new_mode)
 

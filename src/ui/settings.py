@@ -1,11 +1,12 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
     QCheckBox, QPushButton, QRadioButton, QGroupBox, QLineEdit,
-    QTabWidget, QWidget, QDoubleSpinBox
+    QTabWidget, QWidget, QDoubleSpinBox, QMessageBox
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QCursor
 from src.core.audio_recorder import get_input_devices
+from src.core.logger import logger
 
 class SettingsDialog(QDialog):
     def __init__(self, config, parent=None, on_save_callback=None):
@@ -147,7 +148,7 @@ class SettingsDialog(QDialog):
         main_layout.setSpacing(12)
 
         # Title Label
-        title_label = QLabel("⚡ 0xVoice2Text // SYSTEM CONFIGURATION")
+        title_label = QLabel("[SYS] 0xVoice2Text // SYSTEM CONFIGURATION")
         title_label.setFont(QFont("Consolas", 11, QFont.Weight.Bold))
         title_label.setStyleSheet("color: #ffffff; padding-bottom: 2px;")
         main_layout.addWidget(title_label)
@@ -155,14 +156,26 @@ class SettingsDialog(QDialog):
         # Tab Widget
         self.tabs = QTabWidget()
 
-        # TAB 1: VOICE & WAKE WORD (⚡ Активация & VAD Пауза)
+        # TAB 1: VOICE & WAKE WORD
         tab_voice = QWidget()
         voice_main_layout = QVBoxLayout(tab_voice)
         voice_main_layout.setSpacing(12)
 
-        voice_group = QGroupBox("АВТОМАТИЧЕСКАЯ АКТИВАЦИЯ И VAD ПАУЗА (VOSK)")
+        voice_group = QGroupBox("НЕЙРОСЕТЕВОЙ VAD И АКТИВАЦИЯ ГОЛОСОМ (SILERO VAD + VOSK)")
         voice_layout = QVBoxLayout()
         voice_layout.setSpacing(10)
+
+        self.chk_vad_enabled = QCheckBox("Использовать нейросетевой VAD (Silero VAD v5 ONNX)")
+        self.chk_vad_enabled.setChecked(self.config.get("vad_enabled", True))
+
+        vad_thresh_layout = QHBoxLayout()
+        lbl_vad_thresh = QLabel("Порог чувствительности VAD:")
+        self.spin_vad_threshold = QDoubleSpinBox()
+        self.spin_vad_threshold.setRange(0.1, 0.95)
+        self.spin_vad_threshold.setSingleStep(0.05)
+        self.spin_vad_threshold.setValue(float(self.config.get("vad_threshold", 0.5)))
+        vad_thresh_layout.addWidget(lbl_vad_thresh)
+        vad_thresh_layout.addWidget(self.spin_vad_threshold)
 
         self.chk_wake_enabled = QCheckBox("Включить активацию голосом по кодовому слову")
         self.chk_wake_enabled.setChecked(self.config.get("wake_word_enabled", True))
@@ -194,13 +207,15 @@ class SettingsDialog(QDialog):
         pause_h_layout.addWidget(lbl_pause)
         pause_h_layout.addWidget(self.spin_silence_timeout)
 
-        lbl_pause_desc = QLabel("⏱️ Время в секундах (0.5 - 60.0 сек), через которое пауза в речи завершает запись.")
+        lbl_pause_desc = QLabel("[VAD] Время в секундах (0.5 - 60.0 сек), через которое пауза в речи завершает запись.")
         lbl_pause_desc.setFont(QFont("Consolas", 8))
         lbl_pause_desc.setStyleSheet("color: #71717a;")
 
         self.chk_macros_enabled = QCheckBox("Голосовые макросы («Папочка вернулся», «Играем в танки», «Открой ...»)")
         self.chk_macros_enabled.setChecked(self.config.get("voice_macros_enabled", True))
 
+        voice_layout.addWidget(self.chk_vad_enabled)
+        voice_layout.addLayout(vad_thresh_layout)
         voice_layout.addWidget(self.chk_wake_enabled)
         voice_layout.addLayout(wake_h_layout)
         voice_layout.addLayout(stop_h_layout)
@@ -212,7 +227,7 @@ class SettingsDialog(QDialog):
         voice_main_layout.addWidget(voice_group)
         voice_main_layout.addStretch()
 
-        self.tabs.addTab(tab_voice, "⚡ ГОЛОС И ВАД")
+        self.tabs.addTab(tab_voice, "[VAD] ГОЛОС И ВАД")
 
         # TAB 2: AUDIO & STT ENGINE (🎙️ Микрофон & Groq API)
         tab_audio = QWidget()
@@ -239,25 +254,60 @@ class SettingsDialog(QDialog):
         audio_group.setLayout(audio_layout)
         audio_main_layout.addWidget(audio_group)
 
-        # Groq Cloud Engine Group
-        model_group = QGroupBox("GROQ CLOUD API (WHISPER LARGE V3)")
+        # STT Engine Selection Group
+        model_group = QGroupBox("ДВИЖОК РАСПОЗНАВАНИЯ РЕЧИ (STT)")
         model_layout = QVBoxLayout()
+        model_layout.setSpacing(8)
 
-        lbl_hw = QLabel("🚀 Движок: Groq Cloud LPU API (whisper-large-v3)")
-        lbl_hw.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
-        lbl_hw.setStyleSheet("""
-            background: #000000;
-            color: #ffffff;
-            border: 1px solid #ffffff;
-            border-radius: 4px;
-            padding: 6px 10px;
-        """)
-        model_layout.addWidget(lbl_hw)
+        lbl_engine = QLabel("STT Провайдер / Архитектура:")
+        self.combo_stt_engine = QComboBox()
+        engines = [
+            ("[LOCAL] Qwen3-ASR (Local SOTA 2026, GPU DirectML / AVX2)", "qwen3"),
+            ("[CLOUD] Groq Cloud API (Whisper-Large-v3)", "groq")
+        ]
+        curr_engine = self.config.get("stt_engine", "qwen3")
+        engine_idx = 0
+        for i, (lbl, val) in enumerate(engines):
+            self.combo_stt_engine.addItem(lbl, val)
+            if val == curr_engine:
+                engine_idx = i
+        self.combo_stt_engine.setCurrentIndex(engine_idx)
+        model_layout.addWidget(lbl_engine)
+        model_layout.addWidget(self.combo_stt_engine)
 
-        lbl_env = QLabel("Ключ доступа: GROQ_API_KEY в файле .env")
-        lbl_env.setFont(QFont("Consolas", 9))
-        lbl_env.setStyleSheet("color: #a1a1aa; margin-top: 2px;")
-        model_layout.addWidget(lbl_env)
+        lbl_qwen_m = QLabel("Модель Qwen3-ASR:")
+        self.combo_qwen_model = QComboBox()
+        qwen_models = [
+            ("Qwen3-ASR-1.7B ONNX (DirectML GPU / RX 7800 XT 16GB)", "andrewleech/qwen3-asr-1.7b-onnx"),
+            ("Qwen3-ASR-1.7B PyTorch (CPU AVX2)", "Qwen/Qwen3-ASR-1.7B-hf"),
+        ]
+        curr_qwen_m = self.config.get("qwen_model", "andrewleech/qwen3-asr-1.7b-onnx")
+        qwen_idx = 0
+        for i, (lbl, val) in enumerate(qwen_models):
+            self.combo_qwen_model.addItem(lbl, val)
+            if val == curr_qwen_m:
+                qwen_idx = i
+        self.combo_qwen_model.setCurrentIndex(qwen_idx)
+        model_layout.addWidget(lbl_qwen_m)
+        model_layout.addWidget(self.combo_qwen_model)
+
+        lbl_device = QLabel("Вычислительное устройство (Hardware Target):")
+        self.combo_stt_device = QComboBox()
+        devices_list = [
+            ("DirectML GPU (AMD Radeon RX 7800 XT / DirectX 12)", "directml"),
+            ("Auto (DirectML RX 7800 XT / CUDA / CPU AVX2)", "auto"),
+            ("CPU (Intel Core i7-14700KF 20 Cores / AVX2)", "cpu"),
+            ("NVIDIA CUDA (при наличии)", "cuda"),
+        ]
+        curr_dev = self.config.get("stt_device", "auto")
+        dev_idx = 0
+        for i, (lbl, val) in enumerate(devices_list):
+            self.combo_stt_device.addItem(lbl, val)
+            if val == curr_dev:
+                dev_idx = i
+        self.combo_stt_device.setCurrentIndex(dev_idx)
+        model_layout.addWidget(lbl_device)
+        model_layout.addWidget(self.combo_stt_device)
 
         lbl_lang = QLabel("Целевой язык распознавания:")
         self.combo_lang = QComboBox()
@@ -276,9 +326,9 @@ class SettingsDialog(QDialog):
         audio_main_layout.addWidget(model_group)
         audio_main_layout.addStretch()
 
-        self.tabs.addTab(tab_audio, "🎙️ ЗВУК И СТТ")
+        self.tabs.addTab(tab_audio, "[STT] ЗВУК И СТТ")
 
-        # TAB 3: HOTKEYS & OPTIONS (⌨️ Клавиши & Опции)
+        # TAB 3: HOTKEYS & OPTIONS
         tab_options = QWidget()
         opts_main_layout = QVBoxLayout(tab_options)
         opts_main_layout.setSpacing(12)
@@ -325,24 +375,49 @@ class SettingsDialog(QDialog):
         hk_group.setLayout(hk_layout)
         opts_main_layout.addWidget(hk_group)
 
-        # Additional System Options Group
-        sys_group = QGroupBox("ПОВЕДЕНИЕ И ИНТЕРФЕЙС")
-        sys_layout = QVBoxLayout()
+        # TTS Engine & Voice Configuration Group
+        tts_group = QGroupBox("СИНТЕЗ РЕЧИ ДЖАРВИСА (TTS)")
+        tts_layout = QVBoxLayout()
+        tts_layout.setSpacing(8)
 
-        self.chk_auto_paste = QCheckBox("Автоматически вставлять распознанный текст в активное окно")
-        self.chk_auto_paste.setChecked(self.config.get("auto_paste", True))
-        
-        self.chk_trailing_space = QCheckBox("Добавлять пробел после вставки")
-        self.chk_trailing_space.setChecked(self.config.get("add_trailing_space", True))
-
-        self.chk_sound = QCheckBox("Звуковые эффекты старта / стопа записи")
-        self.chk_sound.setChecked(self.config.get("sound_feedback", True))
-
-        self.chk_tts_voice = QCheckBox("Голосовые ответы ассистента (Джарвис TTS)")
+        self.chk_tts_voice = QCheckBox("Включить голосовые ответы ассистента")
         self.chk_tts_voice.setChecked(self.config.get("tts_voice_enabled", True))
+        tts_layout.addWidget(self.chk_tts_voice)
+
+        lbl_tts_engine = QLabel("Движок TTS:")
+        self.combo_tts_engine = QComboBox()
+        tts_engines = [
+            ("[LOCAL] Qwen3-TTS-12Hz (Local SOTA 2026 / Zero-Shot Cloning)", "qwen3"),
+            ("[CLOUD] Edge-TTS (Microsoft Cloud)", "edge")
+        ]
+        curr_tts_engine = self.config.get("tts_engine", "qwen3")
+        tts_eng_idx = 0
+        for i, (lbl, val) in enumerate(tts_engines):
+            self.combo_tts_engine.addItem(lbl, val)
+            if val == curr_tts_engine:
+                tts_eng_idx = i
+        self.combo_tts_engine.setCurrentIndex(tts_eng_idx)
+        tts_layout.addWidget(lbl_tts_engine)
+        tts_layout.addWidget(self.combo_tts_engine)
+
+        lbl_qwen_tts_m = QLabel("Модель Qwen3-TTS:")
+        self.combo_qwen_tts_model = QComboBox()
+        qwen_tts_models = [
+            ("Qwen3-TTS-12Hz-0.6B-Base (Сверхбыстрая / Минимальная задержка)", "Qwen/Qwen3-TTS-12Hz-0.6B-Base"),
+            ("Qwen3-TTS-12Hz-1.7B-CustomVoice (Zero-Shot клонирование тембра)", "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice")
+        ]
+        curr_qwen_tts_m = self.config.get("qwen_tts_model", "Qwen/Qwen3-TTS-12Hz-0.6B-Base")
+        qwen_tts_idx = 0
+        for i, (lbl, val) in enumerate(qwen_tts_models):
+            self.combo_qwen_tts_model.addItem(lbl, val)
+            if val == curr_qwen_tts_m:
+                qwen_tts_idx = i
+        self.combo_qwen_tts_model.setCurrentIndex(qwen_tts_idx)
+        tts_layout.addWidget(lbl_qwen_tts_m)
+        tts_layout.addWidget(self.combo_qwen_tts_model)
 
         tts_h_layout = QHBoxLayout()
-        lbl_tts_voice = QLabel("Голос:")
+        lbl_tts_voice = QLabel("Облачный голос (Edge):")
         self.combo_tts_voice = QComboBox()
         self.combo_tts_voice.addItem("Светлана (Женский)", "ru-RU-SvetlanaNeural")
         self.combo_tts_voice.addItem("Дмитрий (Мужской)", "ru-RU-DmitryNeural")
@@ -362,6 +437,23 @@ class SettingsDialog(QDialog):
         tts_h_layout.addWidget(self.combo_tts_voice)
         tts_h_layout.addWidget(lbl_tts_rate)
         tts_h_layout.addWidget(self.combo_tts_rate)
+        tts_layout.addLayout(tts_h_layout)
+
+        tts_group.setLayout(tts_layout)
+        opts_main_layout.addWidget(tts_group)
+
+        # Additional System Options Group
+        sys_group = QGroupBox("ПОВЕДЕНИЕ И ИНТЕРФЕЙС")
+        sys_layout = QVBoxLayout()
+
+        self.chk_auto_paste = QCheckBox("Автоматически вставлять распознанный текст в активное окно")
+        self.chk_auto_paste.setChecked(self.config.get("auto_paste", True))
+        
+        self.chk_trailing_space = QCheckBox("Добавлять пробел после вставки")
+        self.chk_trailing_space.setChecked(self.config.get("add_trailing_space", True))
+
+        self.chk_sound = QCheckBox("Звуковые эффекты старта / стопа записи")
+        self.chk_sound.setChecked(self.config.get("sound_feedback", True))
 
         self.chk_ontop = QCheckBox("Поверх всех окон (Закрепить виджет)")
         self.chk_ontop.setChecked(self.config.get("always_on_top", True))
@@ -369,16 +461,14 @@ class SettingsDialog(QDialog):
         sys_layout.addWidget(self.chk_auto_paste)
         sys_layout.addWidget(self.chk_trailing_space)
         sys_layout.addWidget(self.chk_sound)
-        sys_layout.addWidget(self.chk_tts_voice)
-        sys_layout.addLayout(tts_h_layout)
         sys_layout.addWidget(self.chk_ontop)
         sys_group.setLayout(sys_layout)
         opts_main_layout.addWidget(sys_group)
         opts_main_layout.addStretch()
 
-        self.tabs.addTab(tab_options, "⌨️ КЛАВИШИ И ПОВЕДЕНИЕ")
+        self.tabs.addTab(tab_options, "[CFG] КЛАВИШИ И ПОВЕДЕНИЕ")
 
-        # TAB 3: AI POST-PROCESSING (🤖 GEMINI / GEMMA)
+        # TAB 4: AI POST-PROCESSING
         tab_ai = QWidget()
         ai_main_layout = QVBoxLayout(tab_ai)
         ai_main_layout.setSpacing(10)
@@ -388,9 +478,9 @@ class SettingsDialog(QDialog):
         ai_mode_layout.setSpacing(8)
 
         self.combo_ai_mode = QComboBox()
-        self.combo_ai_mode.addItem("⚡ DIRECT (Прямой ввод Whisper без ИИ)", "direct")
-        self.combo_ai_mode.addItem("✨ CLEAN (Чистка устной речи — Gemma 4 / Flash Lite)", "clean")
-        self.combo_ai_mode.addItem("🤖 SMART (Умная команда / Рерайт — Gemini Flash)", "smart")
+        self.combo_ai_mode.addItem("[DIRECT] Прямой ввод STT без ИИ", "direct")
+        self.combo_ai_mode.addItem("[CLEAN] Чистка устной речи (Gemma 4 / Flash Lite)", "clean")
+        self.combo_ai_mode.addItem("[SMART] Умная команда / Рерайт (Gemini Flash)", "smart")
         
         curr_ai_mode = self.config.get("ai_mode", "direct")
         mode_idx = 0 if curr_ai_mode == "direct" else (1 if curr_ai_mode == "clean" else 2)
@@ -406,7 +496,7 @@ class SettingsDialog(QDialog):
         self.txt_gemini_key.setEchoMode(QLineEdit.EchoMode.PasswordEchoOnEdit)
         self.txt_gemini_key.setText(self.config.get("gemini_api_key", ""))
         self.txt_gemini_key.setPlaceholderText("Ключ из Google AI Studio (или добавьте GEMINI_API_KEY в .env)")
-        lbl_api_hint = QLabel("💡 Ключ также автоматически подхватывается из файла .env (GEMINI_API_KEY)")
+        lbl_api_hint = QLabel("[INFO] Ключ также автоматически подхватывается из файла .env (GEMINI_API_KEY)")
         lbl_api_hint.setFont(QFont("Consolas", 8))
         lbl_api_hint.setStyleSheet("color: #71717a;")
         api_layout.addWidget(self.txt_gemini_key)
@@ -461,7 +551,7 @@ class SettingsDialog(QDialog):
         ai_main_layout.addWidget(models_group)
         ai_main_layout.addStretch()
 
-        self.tabs.addTab(tab_ai, "🤖 ИИ (GEMINI / GEMMA)")
+        self.tabs.addTab(tab_ai, "[AI] ИИ (GEMINI / GEMMA)")
 
         main_layout.addWidget(self.tabs)
 
@@ -485,35 +575,76 @@ class SettingsDialog(QDialog):
         self.setLayout(main_layout)
 
     def save_settings(self):
-        mic_id = self.combo_mic.currentData()
-        lang = self.combo_lang.currentData()
-        hk = self.combo_hk.currentData()
-        mode = "toggle" if self.radio_toggle.isChecked() else "push_to_talk"
+        try:
+            # Collect all settings into a single dict for batch-write (1 disk I/O)
+            updates = {
+                "audio_device": self.combo_mic.currentData(),
+                "stt_engine": self.combo_stt_engine.currentData(),
+                "qwen_model": self.combo_qwen_model.currentData(),
+                "stt_device": self.combo_stt_device.currentData(),
+                "language": self.combo_lang.currentData(),
+                "hotkey": self.combo_hk.currentData(),
+                "hotkey_mode": "toggle" if self.radio_toggle.isChecked() else "push_to_talk",
+                "vad_enabled": self.chk_vad_enabled.isChecked(),
+                "vad_threshold": float(self.spin_vad_threshold.value()),
+                "wake_word_enabled": self.chk_wake_enabled.isChecked(),
+                "wake_words": self.txt_wake_words.text(),
+                "stop_words": self.txt_stop_words.text(),
+                "silence_timeout": float(self.spin_silence_timeout.value()),
+                "voice_macros_enabled": self.chk_macros_enabled.isChecked(),
+                "auto_paste": self.chk_auto_paste.isChecked(),
+                "add_trailing_space": self.chk_trailing_space.isChecked(),
+                "sound_feedback": self.chk_sound.isChecked(),
+                "tts_voice_enabled": self.chk_tts_voice.isChecked(),
+                "tts_engine": self.combo_tts_engine.currentData(),
+                "qwen_tts_model": self.combo_qwen_tts_model.currentData(),
+                "tts_voice": self.combo_tts_voice.currentData(),
+                "tts_rate": self.combo_tts_rate.currentData(),
+                "always_on_top": self.chk_ontop.isChecked(),
+                "ai_mode": self.combo_ai_mode.currentData(),
+                "gemini_api_key": self.txt_gemini_key.text().strip(),
+                "gemma_model": self.combo_clean_model.currentData(),
+                "gemini_model": self.combo_smart_model.currentData(),
+            }
 
-        self.config.set("audio_device", mic_id)
-        self.config.set("language", lang)
-        self.config.set("hotkey", hk)
-        self.config.set("hotkey_mode", mode)
-        self.config.set("wake_word_enabled", self.chk_wake_enabled.isChecked())
-        self.config.set("wake_words", self.txt_wake_words.text())
-        self.config.set("stop_words", self.txt_stop_words.text())
-        self.config.set("silence_timeout", float(self.spin_silence_timeout.value()))
-        self.config.set("voice_macros_enabled", self.chk_macros_enabled.isChecked())
-        self.config.set("auto_paste", self.chk_auto_paste.isChecked())
-        self.config.set("add_trailing_space", self.chk_trailing_space.isChecked())
-        self.config.set("sound_feedback", self.chk_sound.isChecked())
-        self.config.set("tts_voice_enabled", self.chk_tts_voice.isChecked())
-        self.config.set("tts_voice", self.combo_tts_voice.currentData())
-        self.config.set("tts_rate", self.combo_tts_rate.currentData())
-        self.config.set("always_on_top", self.chk_ontop.isChecked())
+            # Single atomic write to disk
+            ok, err_msg = self.config.set_many(updates)
+            if not ok:
+                logger.error(f"[Settings] Config save failed: {err_msg}")
+                QMessageBox.critical(
+                    self,
+                    "[FAIL] Config Save Error",
+                    f"[SYS] Failed to save configuration to disk.\n\nError: {err_msg}\n\n"
+                    "Check write permissions for data/config.json and available disk space.",
+                    QMessageBox.StandardButton.Ok
+                )
+                return
 
-        # Save AI Settings
-        self.config.set("ai_mode", self.combo_ai_mode.currentData())
-        self.config.set("gemini_api_key", self.txt_gemini_key.text().strip())
-        self.config.set("gemma_model", self.combo_clean_model.currentData())
-        self.config.set("gemini_model", self.combo_smart_model.currentData())
+            logger.info("[Settings] Configuration saved successfully.")
 
+        except Exception as e:
+            logger.error(f"[Settings] Unexpected error collecting settings: {e}")
+            QMessageBox.critical(
+                self,
+                "[CRIT] Settings Error",
+                f"[SYS] Unexpected error while saving settings.\n\nDetails: {e}",
+                QMessageBox.StandardButton.Ok
+            )
+            return
+
+        # Invoke the post-save callback in a separate try/except
+        # so config persistence is never lost due to callback failures
         if self.on_save_callback:
-            self.on_save_callback()
+            try:
+                self.on_save_callback()
+            except Exception as e:
+                logger.error(f"[Settings] Error applying config changes: {e}")
+                QMessageBox.warning(
+                    self,
+                    "[WARN] Apply Error",
+                    f"[SYS] Configuration was saved, but applying changes failed.\n\n"
+                    f"Details: {e}\n\nRestart the application to apply changes manually.",
+                    QMessageBox.StandardButton.Ok
+                )
 
         self.accept()

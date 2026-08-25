@@ -1,21 +1,31 @@
-# --- SYSTEM & OS ---
-.DS_Store
-.DS_Store?
-._*
-Thumbs.db
-desktop.ini
+# =============================================================================
+# 0xVoice2Text // Comprehensive Git Ignore Configuration
+# =============================================================================
 
-# --- IDE & EDITORS ---
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-.project
-.pydevproject
-.settings/
+# --- SECRETS, API KEYS & TOKENS (STRICTLY PRIVATE) ---
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.token
+*.credentials
+credentials.json
+client_secret*.json
+api_keys.*
 
-# --- PYTHON ---
+# --- VIRTUAL ENVIRONMENTS ---
+venv/
+.venv/
+env/
+ENV/
+virtualenv/
+lib/
+lib64/
+share/
+include/
+
+# --- PYTHON RUNTIME & BYTECODE ---
 __pycache__/
 *.py[cod]
 *$py.class
@@ -29,33 +39,79 @@ dist/
 out/
 *.manifest
 *.spec
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# --- ENVIRONMENTS & SECRETS ---
-.env
-.env.*
-*.env
-*.pem
-*.key
+# --- IDE & OS SYSTEM FILES ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+desktop.ini
 
-# --- USER DATA & HISTORY (PRIVATE - DO NOT COMMIT) ---
+# --- HEAVY NEURAL MODELS & WEIGHTS (DO NOT COMMIT BINARIES) ---
+data/models/
+models/
+weights/
+checkpoints/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.onnx
+*.gguf
+*.tflite
+*.engine
+*.plan
+*.ckpt
+*.weights
+*.tar
+*.tar.gz
+*.zip
+*.7z
+
+# --- LOCAL CACHES & HF STORAGE ---
+.cache/
+hf_cache/
+torch_cache/
+huggingface/
+data/audio_cache/
+data/voices/
+data/temp/
+*.cache
+
+# --- USER DATA & HISTORY (PRIVATE) ---
 data/history.json
 data/config.json
-data/audio_cache/
 data/*.json
 !data/config.example.json
-
 history.json
 config.json
+*.db
+*.sqlite
+*.sqlite3
 
-# --- AUDIO & MEDIA CACHE ---
+# --- AUDIO RECORDINGS & GENERATED MEDIA ---
 *.mp3
 *.wav
 *.m4a
 *.flac
 *.ogg
+*.webm
 
-# --- LOGS & IPC ---
+# --- LOGS, DUMPS & IPC BUS ---
 *.log
 logs/
 events.log
 last_event.json
+*.dmp
+*.crash

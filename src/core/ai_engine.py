@@ -127,7 +127,8 @@ class AIEngine:
                 clean_fallbacks.append(m)
 
         last_error = ""
-        for current_model in clean_fallbacks:
+        # Limit to max 2 models in fallback chain to prevent excessive network hang
+        for current_model in clean_fallbacks[:2]:
             try:
                 logger.info(f"[AIEngine] Requesting [{mode.upper()}] via Google API model '{current_model}'...")
                 processed = self._call_gemini_api(
@@ -135,7 +136,7 @@ class AIEngine:
                     model_name=current_model,
                     system_prompt=system_prompt,
                     user_text=raw_text,
-                    timeout=25
+                    timeout=10
                 )
                 if processed and processed.strip():
                     sanitized = strip_ai_reasoning_fluff(processed)
@@ -146,7 +147,7 @@ class AIEngine:
                 last_error = f"GOOGLE_API_HTTP_ERROR {e.code} ({e.reason}) [{current_model}]:\n{err_body}"
                 logger.warning(f"[AIEngine] HTTP {e.code} for model {current_model}, trying next fallback...")
             except urllib.error.URLError as e:
-                last_error = f"NETWORK_TIMEOUT: Превышено время ожидания ответа от {current_model} (25 сек): {e.reason}"
+                last_error = f"NETWORK_TIMEOUT: Превышено время ожидания ответа от {current_model} (10 сек): {e.reason}"
                 logger.warning(f"[AIEngine] Timeout for model {current_model}, trying next fallback...")
             except Exception as e:
                 last_error = f"UNEXPECTED_AI_ERROR [{current_model}]: {str(e)}"
@@ -155,8 +156,10 @@ class AIEngine:
         logger.error(f"[AIEngine] All models failed in mode {mode}. Last error: {last_error}")
         return (raw_text, last_error)
 
-    def _call_gemini_api(self, api_key: str, model_name: str, system_prompt: str, user_text: str, timeout: int = 25) -> str:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+    def _call_gemini_api(self, api_key: str, model_name: str, system_prompt: str, user_text: str, timeout: int = 10) -> str:
+        safe_model = urllib.parse.quote(model_name, safe="")
+        safe_key = urllib.parse.quote(api_key, safe="")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{safe_model}:generateContent?key={safe_key}"
         
         # Primary payload with systemInstruction
         payload = {

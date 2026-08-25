@@ -36,7 +36,18 @@ class TextInjector:
             win32api.keybd_event(VK_V, 0, win32con.KEYEVENTF_KEYUP, 0)
             win32api.keybd_event(VK_CONTROL, 0, win32con.KEYEVENTF_KEYUP, 0)
 
-            time.sleep(0.1)
+            time.sleep(0.08)
+            # 4. Restore original clipboard content so user data is not lost
+            if old_clipboard is not None:
+                def _restore():
+                    time.sleep(0.15)
+                    try:
+                        pyperclip.copy(old_clipboard)
+                    except Exception:
+                        pass
+                import threading
+                threading.Thread(target=_restore, daemon=True).start()
+
             return True
         except Exception as e:
             print(f"[TextInjector] Error injecting text: {e}")

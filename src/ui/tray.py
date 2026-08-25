@@ -108,7 +108,10 @@ class SystemTrayApp:
 
     def set_ai_mode(self, mode: str):
         if hasattr(self.widget, 'config'):
-            self.widget.config.set("ai_mode", mode)
+            try:
+                self.widget.config.set("ai_mode", mode)
+            except Exception as e:
+                print(f"[Tray] [WARN] Failed to persist AI mode change: {e}")
         if hasattr(self.widget, 'update_ai_mode_badge'):
             self.widget.update_ai_mode_badge()
 

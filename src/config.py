@@ -7,15 +7,21 @@ CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
 OLD_CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 
 DEFAULT_CONFIG = {
+    "stt_engine": "qwen3",           # qwen3 (DirectML ONNX), groq
+    "qwen_model": "andrewleech/qwen3-asr-1.7b-onnx", # DirectML ONNX GPU SOTA
+    "groq_model": "whisper-large-v3",
+    "stt_device": "auto",            # auto (DirectML RX 7800 XT / CUDA / AVX2), directml, cpu, cuda
     "model_size": "whisper-large-v3",
     "language": "ru",
-    "device": "cloud",
+    "device": "auto",
     "compute_type": "default",
     "hotkey": "ctrl+space",          # ctrl+space, alt+3, caps_lock, f8, f9, etc.
     "hotkey_mode": "toggle",         # toggle, push_to_talk
     "wake_word_enabled": True,       # Enable voice wake word trigger
     "wake_words": "джарвис, джарвиз, жарвис",
     "stop_words": "стоп",
+    "vad_enabled": True,             # Enable neural Silero VAD (Voice Activity Detection)
+    "vad_threshold": 0.5,            # Speech probability threshold [0.0 - 1.0]
     "silence_timeout": 3.0,          # Pause timeout in seconds before auto-stop
     "voice_macros_enabled": True,    # Enable voice app launching and macro commands
     "audio_device": None,
@@ -26,6 +32,10 @@ DEFAULT_CONFIG = {
     "widget_opacity": 0.92,
     "theme": "cyberpunk_dark",
     "tts_voice_enabled": True,
+    "tts_engine": "qwen3",           # qwen3, edge
+    "qwen_tts_model": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+    "tts_ref_voice": "",             # Path to custom voice .wav file for zero-shot cloning
+    "tts_device": "auto",            # auto, directml, cpu, cuda
     "tts_voice": "ru-RU-SvetlanaNeural",
     "tts_pitch": "+0Hz",
     "tts_rate": "+20%",
@@ -56,17 +66,33 @@ class AppConfig:
             except Exception as e:
                 print(f"[Config] Error loading config: {e}")
 
-    def save(self):
+    def save(self) -> tuple[bool, str]:
+        """Atomically writes config to disk. Returns (success, error_message)."""
         try:
             os.makedirs(DATA_DIR, exist_ok=True)
-            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            tmp_path = CONFIG_FILE + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(self.data, f, indent=4, ensure_ascii=False)
+            # Atomic rename: prevents partial writes from corrupting config
+            if os.path.exists(CONFIG_FILE):
+                os.replace(tmp_path, CONFIG_FILE)
+            else:
+                os.rename(tmp_path, CONFIG_FILE)
+            return True, ""
         except Exception as e:
-            print(f"[Config] Error saving config: {e}")
+            err_msg = f"[Config] Error saving config: {e}"
+            print(err_msg)
+            return False, str(e)
 
     def get(self, key, default=None):
         return self.data.get(key, default)
 
-    def set(self, key, value):
+    def set(self, key, value) -> tuple[bool, str]:
+        """Sets a single key and immediately persists to disk."""
         self.data[key] = value
-        self.save()
+        return self.save()
+
+    def set_many(self, updates: dict) -> tuple[bool, str]:
+        """Batch-sets multiple keys with a single disk write."""
+        self.data.update(updates)
+        return self.save()

@@ -39,11 +39,12 @@ def setup_logger(name="0xVoice2Text") -> logging.Logger:
     except Exception as e:
         print(f"[Logger] Failed to create RotatingFileHandler: {e}")
 
-    # 2. Console Handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    # 2. Console Handler (if stdout is present)
+    if sys.stdout is not None:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
 
     logger.info(f"=== Logging initialized. Log file: {LOG_FILE_PATH} ===")
     return logger

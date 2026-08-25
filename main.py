@@ -1,11 +1,28 @@
 import sys
 import os
+import io
 import threading
 
-if hasattr(sys.stdout, 'reconfigure'):
-    sys.stdout.reconfigure(encoding='utf-8')
-if hasattr(sys.stderr, 'reconfigure'):
-    sys.stderr.reconfigure(encoding='utf-8')
+# 1. Disable TQDM and Hugging Face progress bars globally for GUI / pythonw mode
+os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+os.environ["TQDM_DISABLE"] = "1"
+
+# 2. Redirect stdout/stderr if None (essential when running under pythonw.exe)
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, 'w', encoding='utf-8')
+elif hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, 'w', encoding='utf-8')
+elif hasattr(sys.stderr, 'reconfigure'):
+    try:
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
 
 # Add project root directory to sys.path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -59,11 +76,7 @@ class ApplicationController:
         self.recorder.set_tts_speaking_checker(self.tts.is_speaking)
 
         # STT & AI Engine
-        self.stt = STTEngine(
-            model_size="whisper-large-v3",
-            language=self.config.get("language", "ru"),
-            device="cloud"
-        )
+        self.stt = STTEngine(config=self.config)
         self.ai_engine = AIEngine(self.config)
 
         # Mouse Cursor Holographic HUD Overlay
@@ -119,7 +132,10 @@ class ApplicationController:
 
         self.is_transcribing = False
 
-        # Load Groq STT Engine
+        # Set initial UI state while model compiles / initializes
+        self.widget.set_state_idle("INITIALIZING...")
+
+        # Load STT Engine
         self.stt.load_model(on_complete=lambda ok: self.bridge.model_loaded.emit(ok))
 
         # Start listeners
@@ -130,10 +146,17 @@ class ApplicationController:
         if success:
             self.widget.set_state_idle("READY")
         else:
-            self.widget.set_state_idle("NO GROQ KEY")
+            status = self.stt.status_message if self.stt else "STT ERROR"
+            self.widget.set_state_idle(status[:14])
 
     def on_hotkey_start(self):
         if self.is_transcribing:
+            return
+        if not self.stt.is_ready:
+            status = self.stt.status_message if self.stt else "INITIALIZING..."
+            logger.warning(f"[Main] Hotkey ignored: STT engine is not ready ({status})")
+            if hasattr(self, 'widget') and self.widget:
+                self.widget.set_state_idle(status[:14])
             return
         self.bridge.recording_started.emit()
 
@@ -173,12 +196,13 @@ class ApplicationController:
     def _on_ui_transcription_done(self, text):
         self.is_transcribing = False
         if not text or text.startswith("ERR") or text.startswith("ERROR"):
-            self.widget.set_state_idle("ERR: GROQ")
+            self.widget.set_state_idle("ERR: STT")
             self.tts.play_category("error")
+            engine_name = self.stt.adapter.get_name() if self.stt and self.stt.adapter else "STT Engine"
             self.show_error_dialog(
-                title="Ошибка Groq Cloud API",
-                error_msg=text if text else "Неизвестная ошибка распознавания речи Groq API.",
-                solution_hint="Проверьте правильность GROQ_API_KEY в файле .env или подключение к интернету."
+                title=f"Ошибка {engine_name}",
+                error_msg=text if text else "Неизвестная ошибка распознавания речи.",
+                solution_hint="Проверьте конфигурацию STT движка в настройках (Settings) или подключение к API / VRAM."
             )
             return
 
@@ -190,7 +214,7 @@ class ApplicationController:
 
         # Ignore self-echo of Jarvis's own TTS response phrases
         if self.tts.is_jarvis_phrase(text):
-            logger.info(f"[Main] 🛡️ Filtered out self-echo Jarvis voice phrase: '{text}'")
+            logger.info(f"[Main] [FILTER] Filtered out self-echo Jarvis voice phrase: '{text}'")
             self.widget.set_state_idle("READY")
             return
 
@@ -210,7 +234,7 @@ class ApplicationController:
             if self.config.get("sound_feedback", True):
                 self.tts.play_category("macro")
 
-            self.widget.set_state_inserted(f"⚡ {macro_desc}")
+            self.widget.set_state_inserted(f"[CMD] {macro_desc}")
             return
 
         # Check AI Processing Mode
@@ -305,15 +329,66 @@ class ApplicationController:
             self.settings_dialog.show()
 
     def apply_config_changes(self):
-        print("[Main] Applying updated configuration...")
-        self.recorder.set_device(self.config.get("audio_device"))
+        logger.info("[Main] Applying updated configuration...")
 
-        self.hotkey_mgr.update_key(
-            self.config.get("hotkey", "ctrl+space"),
-            mode=self.config.get("hotkey_mode", "toggle")
-        )
-        self.wake_mgr.reload_config()
-        self.widget.update_hotkey_badge()
+        # --- Lightweight config applications (safe, fast) ---
+        try:
+            self.recorder.set_device(self.config.get("audio_device"))
+        except Exception as e:
+            logger.error(f"[Main] Failed to update audio device: {e}")
+
+        try:
+            self.hotkey_mgr.update_key(
+                self.config.get("hotkey", "ctrl+space"),
+                mode=self.config.get("hotkey_mode", "toggle")
+            )
+        except Exception as e:
+            logger.error(f"[Main] Failed to update hotkey: {e}")
+
+        try:
+            self.wake_mgr.reload_config()
+        except Exception as e:
+            logger.error(f"[Main] Failed to reload wake word config: {e}")
+
+        try:
+            self.widget.update_hotkey_badge()
+        except Exception as e:
+            logger.error(f"[Main] Failed to update hotkey badge: {e}")
+
+        # --- Heavy engine reloads (background threads to avoid GUI freeze) ---
+        def _reload_stt():
+            try:
+                stt_opts = {
+                    "qwen_model": self.config.get("qwen_model", "Qwen/Qwen3-ASR-1.7B-hf"),
+                    "groq_model": self.config.get("groq_model", "whisper-large-v3"),
+                    "stt_device": self.config.get("stt_device", "auto"),
+                    "language": self.config.get("language", "ru")
+                }
+                self.stt.switch_engine(
+                    self.config.get("stt_engine", "qwen3"),
+                    options=stt_opts,
+                    on_complete=lambda ok: self.bridge.model_loaded.emit(ok)
+                )
+            except Exception as e:
+                logger.error(f"[Main] Failed to switch STT engine: {e}")
+                self.bridge.model_loaded.emit(False)
+
+        def _reload_tts():
+            try:
+                tts_opts = {
+                    "qwen_tts_model": self.config.get("qwen_tts_model", "Qwen/Qwen3-TTS-12Hz-0.6B-Base"),
+                    "tts_ref_voice": self.config.get("tts_ref_voice", None),
+                    "tts_device": self.config.get("tts_device", "auto"),
+                    "tts_voice": self.config.get("tts_voice", "ru-RU-SvetlanaNeural"),
+                    "tts_rate": self.config.get("tts_rate", "+20%"),
+                    "tts_pitch": self.config.get("tts_pitch", "+0Hz")
+                }
+                self.tts.switch_engine(self.config.get("tts_engine", "qwen3"), options=tts_opts)
+            except Exception as e:
+                logger.error(f"[Main] Failed to switch TTS engine: {e}")
+
+        threading.Thread(target=_reload_stt, daemon=True).start()
+        threading.Thread(target=_reload_tts, daemon=True).start()
 
     def exit_app(self):
         self.hotkey_mgr.stop()

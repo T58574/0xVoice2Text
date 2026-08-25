@@ -208,7 +208,7 @@ class MacroManager:
                 phrase_norm = phrase.lower().strip()
                 if phrase_norm and (phrase_norm == cleaned_text or phrase_norm == raw_text or phrase_norm in cleaned_text or phrase_norm in raw_text):
                     desc = data.get("description", macro_key.upper())
-                    print(f"[MacroManager] ⚡ EXECUTING MACRO: '{macro_key}' -> {desc}")
+                    print(f"[MacroManager] [CMD] EXECUTING MACRO: '{macro_key}' -> {desc}")
                     self._execute_actions(data.get("actions", []))
                     return True, desc
 
@@ -216,7 +216,7 @@ class MacroManager:
         match_launch = re.match(r'^(открой|запусти)\s+(.+)$', cleaned_text)
         if match_launch:
             app_name = match_launch.group(2).strip()
-            print(f"[MacroManager] ⚡ DYNAMIC LAUNCH: '{app_name}'")
+            print(f"[MacroManager] [CMD] DYNAMIC LAUNCH: '{app_name}'")
             self._execute_actions([{"type": "launch", "target": app_name}])
             return True, f"LAUNCH: {app_name.upper()}"
 
@@ -232,7 +232,7 @@ class MacroManager:
                 return True, "СВЕРНУТЬ ВСЕ ОКНА"
             
             proc_name = app_name if app_name.endswith(".exe") else f"{app_name}.exe"
-            print(f"[MacroManager] ⚡ DYNAMIC CLOSE: '{proc_name}'")
+            print(f"[MacroManager] [CMD] DYNAMIC CLOSE: '{proc_name}'")
             self._execute_actions([{"type": "close", "target": proc_name}])
             return True, f"CLOSE: {app_name.upper()}"
 
@@ -244,16 +244,27 @@ class MacroManager:
                 act_type = action.get("type")
                 try:
                     if act_type == "launch":
-                        target = action.get("target")
+                        target = action.get("target", "").strip()
                         if target:
-                            print(f"[MacroManager] Launching: {target}")
-                            subprocess.Popen(f"start {target}", shell=True)
+                            # Sanitize target to prevent shell command injection
+                            # Strip out shell meta-characters and quotes
+                            clean_target = re.sub(r'[;&|`$<>^"\'\r\n]', '', target).strip()
+                            print(f"[MacroManager] Safely launching: {clean_target}")
+                            if clean_target.startswith(("http://", "https://", "tg://", "steam://", "mailto:")):
+                                os.startfile(clean_target)
+                            else:
+                                os.startfile(clean_target)
 
                     elif act_type == "close":
-                        target = action.get("target")
+                        target = action.get("target", "").strip()
                         if target:
-                            print(f"[MacroManager] Closing process: {target}")
-                            subprocess.run(["taskkill", "/f", "/im", target], capture_output=True)
+                            # Sanitize target to strictly match process name (alphanumeric, dots, dashes, underscores)
+                            clean_proc = re.sub(r'[^a-zA-Z0-9_\-\.]', '', target)
+                            if clean_proc:
+                                if not clean_proc.lower().endswith(".exe"):
+                                    clean_proc = f"{clean_proc}.exe"
+                                print(f"[MacroManager] Safely closing process: {clean_proc}")
+                                subprocess.run(["taskkill", "/f", "/im", clean_proc], capture_output=True, check=False)
 
                     elif act_type == "minimize_all":
                         print("[MacroManager] Minimizing all windows...")
@@ -262,9 +273,7 @@ class MacroManager:
                                 shell = win32com.client.Dispatch("Shell.Application")
                                 shell.MinimizeAll()
                             except Exception:
-                                os.system("powershell -c \"(New-Object -ComObject Shell.Application).MinimizeAll()\"")
-                        else:
-                            os.system("powershell -c \"(New-Object -ComObject Shell.Application).MinimizeAll()\"")
+                                pass
 
                     elif act_type == "restore_all":
                         print("[MacroManager] Restoring windows...")
@@ -337,12 +346,18 @@ class MacroManager:
                         ctypes.windll.user32.LockWorkStation()
 
                     elif act_type == "shutdown":
-                        delay = action.get("delay", 15)
+                        try:
+                            delay = max(0, min(3600, int(action.get("delay", 15))))
+                        except (ValueError, TypeError):
+                            delay = 15
                         print(f"[MacroManager] Scheduling PC shutdown in {delay}s...")
                         os.system(f'shutdown /s /t {delay} /c "Завершение работы по команде Джарвиса"')
 
                     elif act_type == "restart":
-                        delay = action.get("delay", 15)
+                        try:
+                            delay = max(0, min(3600, int(action.get("delay", 15))))
+                        except (ValueError, TypeError):
+                            delay = 15
                         print(f"[MacroManager] Scheduling PC restart in {delay}s...")
                         os.system(f'shutdown /r /t {delay} /c "Перезагрузка по команде Джарвиса"')
 

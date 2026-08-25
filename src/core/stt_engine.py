@@ -1,129 +1,126 @@
-import os
-import io
-import wave
 import threading
+from typing import Callable, Optional
 import numpy as np
-from dotenv import load_dotenv
-from groq import Groq
 
 from src.core.logger import logger
-
-# Load environment variables from project root .env file
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-ENV_PATH = os.path.join(BASE_DIR, ".env")
-load_dotenv(ENV_PATH)
-
-def numpy_to_wav_bytes(audio_data: np.ndarray, sample_rate=16000) -> io.BytesIO:
-    """Converts 16kHz float32 numpy array into an in-memory WAV file buffer."""
-    pcm_data = (np.clip(audio_data, -1.0, 1.0) * 32767).astype(np.int16)
-    wav_io = io.BytesIO()
-    with wave.open(wav_io, 'wb') as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2) # 16-bit PCM
-        wf.setframerate(sample_rate)
-        wf.writeframes(pcm_data.tobytes())
-    
-    wav_io.seek(0)
-    wav_io.name = "audio.wav"
-    return wav_io
+from src.core.stt.base import BaseSTTAdapter
+from src.core.stt.factory import STTFactory
 
 class STTEngine:
-    def __init__(self, model_size="whisper-large-v3", device="cloud", compute_type="default", language="ru"):
-        self.model_name = "whisper-large-v3" # User specifically requested non-turbo whisper-large-v3
-        self.language = language if language != "auto" else None
-        
-        self.client = None
+    """
+    Unified STT Engine Facade.
+    Delegates transcription and model management to pluggable STT adapters (Qwen3-ASR, Groq, etc.).
+    Thread-safe implementation with strict concurrency locks.
+    """
+    def __init__(
+        self,
+        engine_name: str = "qwen3",
+        model_size: str = "Qwen/Qwen3-ASR-1.7B-hf",
+        device: str = "auto",
+        compute_type: str = "default",
+        language: str = "ru",
+        config = None
+    ):
+        self.config = config
+        self.language = language if language != "auto" else "ru"
+        self.device = device
+        self.engine_name = engine_name
+
+        if self.config:
+            self.engine_name = self.config.get("stt_engine", self.engine_name)
+            self.language = self.config.get("language", self.language)
+            self.device = self.config.get("stt_device", self.device)
+
         self._lock = threading.Lock()
-        self.is_loading = False
-        self.is_ready = False
-        self.status_message = "GROQ CLOUD API"
+        self.adapter: Optional[BaseSTTAdapter] = None
+        self._init_adapter()
 
-    def get_api_key(self):
-        # Reload dotenv in case user edited .env while app was running
-        load_dotenv(ENV_PATH, override=True)
-        key = os.getenv("GROQ_API_KEY", "").strip()
-        return key
-
-    def load_model(self, on_complete=None):
-        """Initializes Groq Cloud API client."""
-        def _worker():
-            with self._lock:
-                if self.is_loading:
-                    return
-                self.is_loading = True
-
-            api_key = self.get_api_key()
-            if not api_key or api_key == "gsk_your_groq_api_key_here":
-                logger.warning("[STTEngine] Warning: GROQ_API_KEY is not set in .env file!")
-                self.is_ready = False
-                self.status_message = "NO GROQ KEY IN .ENV"
-            else:
-                try:
-                    self.client = Groq(api_key=api_key)
-                    self.is_ready = True
-                    self.status_message = "GROQ API READY"
-                    logger.info("[STTEngine] Groq API client initialized successfully with 'whisper-large-v3'!")
-                except Exception as e:
-                    logger.error(f"[STTEngine] Error initializing Groq client: {e}", exc_info=True)
-                    self.is_ready = False
-                    self.status_message = "GROQ CLIENT ERR"
-
-            self.is_loading = False
-            if on_complete:
-                on_complete(self.is_ready)
-
-        thread = threading.Thread(target=_worker, daemon=True).start()
-
-    def transcribe(self, audio_data: np.ndarray):
-        """
-        Sends audio buffer to Groq Cloud API for ultra-fast Whisper Large V3 transcription.
-        """
-        api_key = self.get_api_key()
-        if not api_key or api_key == "gsk_your_groq_api_key_here":
-            logger.error("[STTEngine] Error: GROQ_API_KEY missing from .env!")
-            return "ERR: GROQ_KEY_MISSING"
-
-        if self.client is None:
-            try:
-                self.client = Groq(api_key=api_key)
-                self.is_ready = True
-            except Exception as e:
-                logger.error(f"[STTEngine] Failed to create Groq client: {e}", exc_info=True)
-                return f"ERR: GROQ_INIT_FAILED ({e})"
-
-        if audio_data is None or len(audio_data) < 1600:
-            return ""
-
-        try:
-            import time
-            t0 = time.time()
-            wav_file = numpy_to_wav_bytes(audio_data, sample_rate=16000)
-
-            logger.info(f"[STTEngine] Sending audio ({len(audio_data)/16000:.2f}s) to Groq Cloud API (whisper-large-v3)...")
-
-            kwargs = {
-                "file": ("speech.wav", wav_file.read()),
-                "model": self.model_name,
-                "response_format": "text",
-                "temperature": 0.0
+    def _init_adapter(self):
+        with self._lock:
+            options = {
+                "qwen_model": self.config.get("qwen_model", "Qwen/Qwen3-ASR-1.7B-hf") if self.config else "Qwen/Qwen3-ASR-1.7B-hf",
+                "groq_model": self.config.get("groq_model", "whisper-large-v3") if self.config else "whisper-large-v3",
+                "stt_device": self.device,
+                "language": self.language
             }
-            if self.language:
-                kwargs["language"] = self.language
+            self.adapter = STTFactory.create_adapter(self.engine_name, options)
 
-            response = self.client.audio.transcriptions.create(**kwargs)
+    @property
+    def is_ready(self) -> bool:
+        with self._lock:
+            return self.adapter.is_ready() if self.adapter else False
 
-            # Response is string if response_format="text"
-            text = str(response).strip() if response else ""
-            dt = time.time() - t0
-            logger.info(f"[STTEngine] [Groq Cloud] Transcribed in {dt:.3f}s: '{text}'")
-            return text
+    @property
+    def is_loading(self) -> bool:
+        return not self.is_ready
+
+    @property
+    def status_message(self) -> str:
+        with self._lock:
+            return self.adapter.get_status() if self.adapter else "NO ADAPTER"
+
+    def load_model(self, on_complete: Optional[Callable[[bool], None]] = None) -> None:
+        """Asynchronously loads the underlying STT adapter model."""
+        with self._lock:
+            if not self.adapter:
+                self._init_adapter()
+            curr_adapter = self.adapter
+
+        logger.info(f"[STTEngine] Loading STT Adapter: {curr_adapter.get_name()}")
+        curr_adapter.load_model(on_complete=on_complete)
+
+    def transcribe(self, audio_data: np.ndarray) -> str:
+        """Transcribes incoming audio array through the active adapter."""
+        with self._lock:
+            curr_adapter = self.adapter
+            curr_lang = self.language
+
+        if not curr_adapter:
+            return "ERR: NO_ADAPTER"
+
+        return curr_adapter.transcribe(audio_data, sample_rate=16000, language=curr_lang)
+
+    def switch_engine(
+        self,
+        engine_name: str,
+        options: Optional[dict] = None,
+        on_complete: Optional[Callable[[bool], None]] = None
+    ) -> None:
+        """Hot-swaps the STT adapter at runtime in a thread-safe manner."""
+        try:
+            with self._lock:
+                if self.adapter:
+                    try:
+                        self.adapter.unload()
+                    except Exception as e:
+                        logger.warning(f"[STTEngine] Error unloading previous adapter: {e}")
+
+                self.engine_name = engine_name
+                opts = options or {}
+                if "language" in opts:
+                    self.language = opts["language"]
+                if "stt_device" in opts:
+                    self.device = opts["stt_device"]
+
+                self.adapter = STTFactory.create_adapter(engine_name, opts)
+                curr_adapter = self.adapter
+
+            logger.info(f"[STTEngine] Switched to adapter: {curr_adapter.get_name()}")
+            curr_adapter.load_model(on_complete=on_complete)
         except Exception as e:
-            logger.error(f"[STTEngine] Groq API transcription error: {e}", exc_info=True)
-            err_msg = str(e)
-            if "api_key" in err_msg.lower() or "401" in err_msg:
-                return "ERR: GROQ_401_UNAUTHORIZED"
-            return f"ERR: GROQ_API_ERROR ({err_msg})"
+            logger.error(f"[STTEngine] Failed to switch engine to '{engine_name}': {e}")
+            if on_complete:
+                on_complete(False)
 
-    def change_model(self, model_size="whisper-large-v3", language="ru", device="cloud", on_complete=None):
-        self.language = language if language != "auto" else None
-        self.load_model(on_complete=on_complete)
+    def change_model(
+        self,
+        model_size: str = "Qwen/Qwen3-ASR-1.7B-hf",
+        language: str = "ru",
+        device: str = "auto",
+        on_complete: Optional[Callable[[bool], None]] = None
+    ) -> None:
+        self.switch_engine(
+            self.engine_name,
+            options={"qwen_model": model_size, "stt_device": device, "language": language if language != "auto" else "ru"},
+            on_complete=on_complete
+        )

@@ -4,12 +4,13 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52?style=flat-square&logo=qt&logoColor=white)](https://riverbankcomputing.com/software/pyqt/)
+[![Qwen3-ASR](https://img.shields.io/badge/STT-Qwen3--ASR_ONNX_(DirectML)-blue?style=flat-square)](https://huggingface.co/andrewleech/qwen3-asr-1.7b-onnx)
 [![Whisper](https://img.shields.io/badge/STT-Whisper_Large_V3-teal?style=flat-square)](https://github.com/openai/whisper)
-[![Silero VAD](https://img.shields.io/badge/VAD-Silero_Voice_Activity-blueviolet?style=flat-square)](https://github.com/snakers4/silero-vad)
+[![Silero VAD](https://img.shields.io/badge/VAD-Silero_Voice_Activity_v5-blueviolet?style=flat-square)](https://github.com/snakers4/silero-vad)
 [![Gemini](https://img.shields.io/badge/AI_Engine-Gemini_3.6_%2F_Gemma-4285F4?style=flat-square&logo=google&logoColor=white)](https://aistudio.google.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-**An ultra-low latency (<500ms), privacy-focused Windows desktop voice transcription engine, neural speech assistant, and AI prompt refiner powered by Whisper Large V3, Silero VAD, Edge-TTS, and Google Gemini AI.**
+**An ultra-low latency, privacy-focused Windows desktop voice transcription engine, neural speech assistant, and AI prompt refiner powered by Qwen3-ASR ONNX (DirectML GPU / AVX2), Whisper Large V3, Silero VAD v5, Qwen3-TTS, and Google Gemini AI.**
 
 [Key Features](#-key-features) • [Architecture](#-architecture) • [AI Post-Processing](#-ai-intelligence-modes) • [IPC Bus](#-universal-ipc-event-bus) • [Quick Start](#-quick-start) • [License](#-license)
 
@@ -19,24 +20,24 @@
 
 ## 📖 Overview
 
-**0xVoice2Text** is a high-performance desktop voice dictation engine and AI speech assistant crafted for software engineers, power users, and writers on Windows. It eliminates the friction of voice typing by capturing microphone audio, isolating speech with **Silero Voice Activity Detection (VAD)**, transcribing at ultra-high speed via **Whisper Large V3**, and automatically injecting clean, punctuated text directly into your active code editor or browser.
+**0xVoice2Text** is a high-performance desktop voice dictation engine and AI speech assistant crafted for software engineers, power users, and writers on Windows. It eliminates the friction of voice typing by capturing microphone audio, isolating speech with **Silero Voice Activity Detection (VAD v5)**, transcribing locally at ultra-high speed via **Qwen3-ASR 1.7B ONNX** (accelerated in GPU VRAM via **DirectML / DirectX 12**) or cloud **Whisper Large V3**, and automatically injecting clean, punctuated text directly into your active code editor or browser.
 
-Beyond simple speech-to-text, 0xVoice2Text features an intelligent **AI Post-Processing Pipeline** (powered by Gemini 3.6 Flash and Gemma) that cleans verbal debris ("um", "like", "you know"), reformats stream-of-consciousness dictation into clean code or prompts, and provides zero-latency neural voice feedback via Windows MCI audio APIs.
+Beyond simple speech-to-text, 0xVoice2Text features an intelligent **AI Post-Processing Pipeline** (powered by Gemini 3.6 Flash and Gemma) that cleans verbal debris ("um", "like", "you know"), reformats stream-of-consciousness dictation into clean code or prompts, and provides zero-latency neural voice feedback via **Qwen3-TTS** and **Microsoft Edge Neural voices**.
 
 ---
 
 ## ✨ Key Features
 
-- ⚡ **Sub-Second Speech-to-Text (<500ms)**
-  - Powered by Groq Cloud Whisper Large V3 (and local Whisper fallback) with automatic multilingual detection (`ru`, `en`, etc.) and immediate clipboard text injection.
-- 🎯 **Silero Voice Activity Detection (VAD)**
-  - Real-time audio stream analysis automatically detects natural speech pauses and stops recording without requiring manual hotkey release.
+- ⚡ **Local DirectML GPU Acceleration & Cloud STT Fallback**
+  - Powered by **Qwen3-ASR 1.7B ONNX** with native DirectX 12 DirectML hardware acceleration (tested on AMD Radeon RX 7800 XT and Intel/NVIDIA) with CPU AVX2 multi-threading and Groq Cloud Whisper Large V3 fallback.
+- 🎯 **Silero Voice Activity Detection (VAD v5)**
+  - Real-time neural audio stream analysis automatically detects natural speech pauses and finalizes dictation without requiring manual hotkey release.
 - 🗣️ **Wake Word & Voice Macro Automation**
-  - Continuous low-power listening for wake phrases (*"Джарвис"* / *"Jarvis"*) to activate dictation hands-free, plus custom voice macros for launching applications.
+  - Continuous low-power listening via Vosk for wake phrases (*"Джарвис"* / *"Jarvis"*) to activate dictation hands-free, plus custom voice macros for launching applications.
 - 🧠 **Multi-Tier AI Post-Processing Pipeline**
-  - Toggle seamlessly between raw verbatim output, automatic speech sanitation, and smart code/prompt refactoring directly from the desktop widget.
-- 🔊 **Zero-Latency Neural TTS Feedback**
-  - Pre-cached Microsoft Edge Neural voices (`ru-RU-SvetlanaNeural`, `ru-RU-DmitryNeural`) played instantly via native Windows MCI (`winmm.dll`) without external media player dependencies.
+  - Toggle seamlessly between raw verbatim output (`DIRECT`), automatic speech sanitation (`CLEAN` via Gemma), and smart code/prompt refactoring (`SMART` via Gemini Flash) directly from the desktop widget.
+- 🔊 **Neural TTS Feedback (Local & Cloud)**
+  - Dual-engine vocal responses supporting local **Qwen3-TTS-12Hz** zero-shot cloning and Microsoft Edge Neural voices (`ru-RU-SvetlanaNeural`, `ru-RU-DmitryNeural`) played instantly via native Windows MCI (`winmm.dll`).
 - 🎨 **Futuristic Cyberpunk UI & Floating Overlays**
   - **Radial Mouse HUD**: Neon status circle tracking the cursor with animated recording rings.
   - **Glassmorphic Desktop Pill**: Compact floating widget with interactive mode toggles and audio waveform visualizer.
@@ -54,13 +55,14 @@ Beyond simple speech-to-text, 0xVoice2Text features an intelligent **AI Post-Pro
 └─────────────────────────────────┬────────────────────────────────┘
                                   │ 16kHz PCM Audio Stream
 ┌─────────────────────────────────▼────────────────────────────────┐
-│             Silero Voice Activity Detection (VAD)                │
+│           Silero Voice Activity Detection v5 ONNX Engine         │
 │    (Filters silence & background noise, detects natural pauses)  │
 └─────────────────────────────────┬────────────────────────────────┘
                                   │ Buffered Speech Chunk
 ┌─────────────────────────────────▼────────────────────────────────┐
-│               Whisper Large V3 Transcription Engine              │
-│       (Ultra-fast speech-to-text decoding via Groq API)          │
+│         STTEngine Facade (src/core/stt/)                         │
+│  ├── [Adapter 1] Qwen3ONNXAdapter (DirectML GPU / AVX2 CPU)      │
+│  └── [Adapter 2] GroqSTTAdapter (Whisper Large V3 Cloud Fallback)│
 └─────────────────────────────────┬────────────────────────────────┘
                                   │ Raw Transcribed Text
 ┌─────────────────────────────────▼────────────────────────────────┐
@@ -70,7 +72,7 @@ Beyond simple speech-to-text, 0xVoice2Text features an intelligent **AI Post-Pro
 │  │ Direct Mode (Verbatim) │  │ Clean Mode (Strip Fillers)     │  │
 │  └────────────────────────┘  └────────────────────────────────┘  │
 │  ┌────────────────────────┐  ┌────────────────────────────────┐  │
-│  │ Smart Mode (AI Refine) │  │ Neural TTS Voice Feedback      │  │
+│  │ Smart Mode (AI Refine) │  │ Neural TTS Feedback (Qwen3/Edge│  │
 │  └────────────────────────┘  └────────────────────────────────┘  │
 └─────────────────────────────────┬────────────────────────────────┘
                                   │ Clean Formatted Text
@@ -86,7 +88,7 @@ Beyond simple speech-to-text, 0xVoice2Text features an intelligent **AI Post-Pro
 
 | Mode | Engine | Purpose | Output Example |
 |---|---|---|---|
-| ⚡ **DIRECT** | Groq Whisper V3 | 0ms instant verbatim output with punctuation | *"найди в интернете инфу про танк тигр 2"* |
+| ⚡ **DIRECT** | Qwen3-ASR / Whisper V3 | Instant verbatim output with natural punctuation | *"найди в интернете инфу про танк тигр 2"* |
 | ✨ **CLEAN** | Gemma 4 / Flash Lite | Strips verbal debris, hesitations ("э-э-э", "ну", "типа"), fixes syntax | *"Найди информацию про танк Tiger II."* |
 | 🤖 **SMART** | Gemini 3.6 Flash | Converts dictated thoughts into clean prompts, structured specs, or code | *"Собери подробную справку по танку Tiger II: история создания, компоновка трансмиссии и бронирование."* |
 
@@ -98,9 +100,9 @@ Every completed voice event is instantly broadcast to `~/.0xvoice2text/last_even
 
 ```json
 {
-  "timestamp": "2026-08-15T03:15:00+0300",
+  "timestamp": "2026-08-25T21:30:00+0300",
   "unix_timestamp": 1786752900,
-  "engine": "groq-whisper-large-v3",
+  "engine": "qwen3-asr-onnx-directml",
   "ai_mode": "smart",
   "language": "ru",
   "text": "Refactor auth controller into modular middleware pipeline.",
@@ -145,13 +147,13 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 3. Configure API Keys
+### 3. Configure API Keys (Optional)
 Copy `.env.example` to `.env` and insert your credentials:
 ```bash
 cp .env.example .env
 ```
 ```ini
-# Required for ultra-fast transcription (https://console.groq.com/keys)
+# Optional: Fallback cloud transcription (https://console.groq.com/keys)
 GROQ_API_KEY=gsk_your_groq_api_key_here
 
 # Optional: Required for Clean & Smart AI modes (https://aistudio.google.com/app/apikey)
@@ -159,12 +161,12 @@ GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
 ### 4. Run Application
-```bash
-python main.py
-```
-Or launch via the included shortcut batch file:
 ```cmd
+# Standard background launch
 run.bat
+
+# Or launch in interactive debug mode with live terminal logs
+run.bat --debug
 ```
 
 ---
@@ -173,32 +175,49 @@ run.bat
 
 ```
 0xVoice2Text/
+├── main.py                     # Master application orchestrator & Qt event bridge
+├── run.bat                     # Intelligent one-click Windows launcher (venv auto-detect)
+├── requirements.txt            # System dependencies
+├── .env.example                # Template for API credentials
+├── GEMINI.md                   # System architecture and hardware specifications
+├── README.md                   # Project documentation
 ├── src/
-│   ├── core/                # Core Audio & AI Services
-│   │   ├── ai_engine.py     # Gemini & Gemma AI post-processing pipeline
-│   │   ├── audio_recorder.py# PyAudio stream capturer & VAD integrator
-│   │   ├── history.py       # Local JSON history storage
-│   │   ├── ipc_bus.py       # IPC event bus dispatcher
-│   │   ├── stt_engine.py    # Whisper Large V3 API client
-│   │   └── wake_word.py     # Continuous wake word listening daemon
-│   ├── services/            # System & OS Integration
-│   │   ├── hotkeys.py       # Global Windows keyboard hooks
-│   │   ├── injector.py      # Active window keystroke/clipboard injector
-│   │   ├── macros.py        # Voice command macro dispatcher
-│   │   └── tts.py           # Native MCI audio & Edge-TTS synthesizer
-│   └── ui/                  # PyQt6 Desktop User Interface
-│       ├── error_dialog.py  # User-friendly API error diagnostic dialog
-│       ├── history.py       # Full-text searchable history window
-│       ├── mouse_hud.py     # Radial neon cursor HUD overlay
-│       ├── settings.py      # Multi-tab settings configuration dialog
-│       ├── tray.py          # Windows notification area system tray icon
-│       └── widget.py        # Glassmorphic floating desktop status pill
-├── .env.example             # Template for API credentials
-├── .gitignore               # Strict ignore rules for audio & secrets
-├── main.py                  # Master application orchestrator
-├── requirements.txt         # Python package dependencies
-├── run.bat                  # One-click Windows launcher
-└── LICENSE                  # MIT License
+│   ├── config.py               # JSON-backed dynamic configuration manager
+│   ├── core/                   # Core Audio, Speech & AI Services
+│   │   ├── stt/                # Pluggable STT Subsystem
+│   │   │   ├── base.py         # BaseSTTAdapter ABC
+│   │   │   ├── factory.py      # Dynamic STT adapter factory
+│   │   │   ├── qwen3_onnx_adapter.py # Qwen3-ASR ONNX DirectML/AVX2 engine
+│   │   │   └── groq_adapter.py # Groq Cloud Whisper Large V3 engine
+│   │   ├── stt_engine.py       # Thread-safe unified STT facade
+│   │   ├── vad_engine.py       # Silero VAD v5 ONNX engine
+│   │   ├── audio_recorder.py   # sounddevice recorder & RMS audio visualizer
+│   │   ├── wake_word.py        # Vosk Wake Word & Silero VAD session manager
+│   │   ├── ai_engine.py        # Gemini & Gemma AI post-processing pipeline
+│   │   ├── history.py          # SQLite / JSON transcription history manager
+│   │   ├── ipc_bus.py          # IPC event bus dispatcher (~/.0xvoice2text)
+│   │   └── logger.py           # Rotating file & console logging system
+│   ├── services/               # System & OS Integration
+│   │   ├── tts/                # Pluggable TTS Subsystem
+│   │   │   ├── base.py         # BaseTTSAdapter ABC
+│   │   │   ├── factory.py      # Dynamic TTS adapter factory
+│   │   │   ├── qwen3_tts_adapter.py # Qwen3-TTS-12Hz zero-shot engine
+│   │   │   ├── edge_adapter.py # Microsoft Edge Neural TTS engine
+│   │   │   └── service.py      # JarvisVoiceService (MCI audio & anti-echo guard)
+│   │   ├── hotkeys.py          # Global Windows keyboard hooks (Toggle / PTT)
+│   │   ├── injector.py         # Active window keystroke & clipboard injector
+│   │   └── macros.py           # Voice command macro dispatcher
+│   └── ui/                     # PyQt6 Desktop User Interface
+│       ├── error_dialog.py     # Diagnostic error modal with resolution hints
+│       ├── history.py          # Searchable transcription history drawer
+│       ├── mouse_hud.py        # Radial neon cursor HUD overlay ring
+│       ├── settings.py         # Multi-tab settings configuration dialog
+│       ├── tray.py             # Windows notification area system tray icon
+│       └── widget.py           # Glassmorphic floating desktop status pill
+├── test_full_system.py         # Comprehensive full-system validation suite
+├── test_stt_adapter.py         # STT adapter unit tests
+├── test_tts_adapter.py         # TTS adapter unit tests
+└── LICENSE                     # MIT License
 ```
 
 ---

@@ -1,20 +1,24 @@
 import os
 import json
 import re
+import queue
 import threading
 import time
 import numpy as np
 import sounddevice as sd
 import vosk
+from src.core.vad_engine import SileroVAD
 
 # Suppress debug logs from Vosk C++ core
 vosk.SetLogLevel(-1)
 
 class WakeWordManager:
     """
-    Background manager powered by Vosk (ru model) for:
-    1. Wake word detection (e.g., 'джарвис') -> Triggers recording start.
-    2. Voice stop detection (e.g., 'стоп') -> Triggers recording stop.
+    Background manager powered by Silero VAD (ONNX) and Vosk (ru model) for:
+    1. Non-blocking Producer-Consumer Audio Queue Architecture.
+    2. Neural Voice Activity Detection (Silero VAD v5) for speech/silence gating.
+    3. Wake word detection (e.g., 'джарвис') -> Triggers recording start.
+    4. Voice stop detection (e.g., 'стоп') and neural silence auto-stop.
     """
     def __init__(self, config, on_wake_detected=None, on_stop_detected=None):
         self.config = config
@@ -22,10 +26,14 @@ class WakeWordManager:
         self.on_stop_detected = on_stop_detected
 
         self.model = None
+        self.vad = SileroVAD(threshold=float(self.config.get("vad_threshold", 0.5)))
+        self.vad_enabled = bool(self.config.get("vad_enabled", True))
         self.is_running = False
         self.is_recording_state = False
+        self.current_device = self.config.get("audio_device")
         self._thread = None
         self._lock = threading.Lock()
+        self._audio_queue = queue.Queue(maxsize=50)
         self.stream = None
         self.last_trigger_time = 0.0
         self.last_speech_time = 0.0
@@ -49,7 +57,21 @@ class WakeWordManager:
             self.wake_words = self._parse_word_list("wake_words", ["джарвис", "джарвиз", "жарвис"])
             self.stop_words = self._parse_word_list("stop_words", ["стоп", "стопнули"])
             self.silence_timeout = float(self.config.get("silence_timeout", 3.0))
-        print(f"[WakeWordManager] Reloaded config. Wake words: {self.wake_words}, Stop words: {self.stop_words}, Silence timeout: {self.silence_timeout}s")
+            self.vad_enabled = bool(self.config.get("vad_enabled", True))
+            vad_thresh = float(self.config.get("vad_threshold", 0.5))
+            if self.vad:
+                self.vad.threshold = vad_thresh
+            new_device = self.config.get("audio_device")
+
+        print(f"[WakeWordManager] Reloaded config. Wake words: {self.wake_words}, Stop words: {self.stop_words}, Silence timeout: {self.silence_timeout}s, VAD enabled: {self.vad_enabled}")
+        
+        # Hot-switch audio device if changed
+        if new_device != self.current_device:
+            print(f"[WakeWordManager] Audio device changed from {self.current_device} to {new_device}. Restarting listener...")
+            self.current_device = new_device
+            if self.is_running:
+                self.stop()
+                self.start()
 
     def start(self):
         if not self.config.get("wake_word_enabled", True):
@@ -60,6 +82,7 @@ class WakeWordManager:
             return
 
         self.is_running = True
+        self._audio_queue = queue.Queue(maxsize=50)
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
 
@@ -80,11 +103,14 @@ class WakeWordManager:
             if is_recording:
                 self.has_spoken_in_recording = False
                 self.last_speech_time = time.time()
+                if self.vad:
+                    self.vad.reset_state()
 
     def _run_loop(self):
         print("[WakeWordManager] Loading local Vosk Russian model (vosk-model-small-ru-0.22)...")
         try:
-            self.model = vosk.Model(lang="ru")
+            if self.model is None:
+                self.model = vosk.Model(lang="ru")
             print("[WakeWordManager] Vosk model loaded successfully!")
         except Exception as e:
             print(f"[WakeWordManager] Failed to load Vosk model: {e}")
@@ -96,53 +122,13 @@ class WakeWordManager:
         def audio_callback(indata, frames, time_info, status):
             if not self.is_running:
                 return
-            
-            # Convert float32 input buffer [-1.0, 1.0] to 16-bit int PCM bytes
-            mono_float = indata[:, 0]
-            pcm16 = (mono_float * 32767).astype(np.int16).tobytes()
+            # PortAudio real-time callback: strictly push to queue with zero heavy computation
+            try:
+                self._audio_queue.put_nowait(indata[:, 0].copy())
+            except queue.Full:
+                pass  # Avoid thread blocking
 
-            # Calculate RMS for Silence Detection (VAD)
-            rms = float(np.sqrt(np.mean(mono_float ** 2))) if len(mono_float) > 0 else 0.0
-            now = time.time()
-
-            with self._lock:
-                rec_state = self.is_recording_state
-                silence_limit = self.silence_timeout
-
-            if not rec_state:
-                # Continuously calibrate ambient microphone noise floor during IDLE
-                self.idle_rms_history.append(rms)
-                if len(self.idle_rms_history) > 60: # ~1.5 sec rolling window
-                    self.idle_rms_history.pop(0)
-            else:
-                # Dynamic Adaptive Speech Threshold: 2.2x background noise floor
-                ambient_floor = float(np.median(self.idle_rms_history)) if self.idle_rms_history else 0.005
-                speech_threshold = max(0.012, ambient_floor * 2.2 + 0.006)
-
-                if rms > speech_threshold:
-                    self.last_speech_time = now
-                    self.has_spoken_in_recording = True
-                elif self.has_spoken_in_recording and (now - self.last_speech_time > silence_limit) and (now - self.last_trigger_time > 1.4):
-                    print(f"[WakeWordManager] ⏱️ ADAPTIVE SILENCE DETECTED ({silence_limit}s pause, RMS: {rms:.4f} <= Thresh: {speech_threshold:.4f}) -> Auto-stopping!")
-                    self.has_spoken_in_recording = False
-                    self.last_trigger_time = now
-                    if self.on_stop_detected:
-                        self.on_stop_detected()
-
-            if rec.AcceptWaveform(pcm16):
-                result_json = json.loads(rec.Result())
-                text = result_json.get("text", "").lower()
-                self._check_text(text)
-            else:
-                partial_json = json.loads(rec.PartialResult())
-                partial_text = partial_json.get("partial", "").lower()
-                if partial_text:
-                    if rec_state:
-                        self.has_spoken_in_recording = True
-                        self.last_speech_time = now
-                    self._check_text(partial_text)
-
-        device = self.config.get("audio_device")
+        device = self.current_device
         print(f"[WakeWordManager] Starting Vosk stream listener on audio device {device}...")
 
         try:
@@ -155,8 +141,69 @@ class WakeWordManager:
                 blocksize=4000
             )
             self.stream.start()
+
+            # Dedicated Consumer Loop running in background worker thread
             while self.is_running:
-                time.sleep(0.1)
+                try:
+                    mono_float = self._audio_queue.get(timeout=0.1)
+                except queue.Empty:
+                    continue
+
+                pcm16 = (mono_float * 32767).astype(np.int16).tobytes()
+                now = time.time()
+
+                with self._lock:
+                    rec_state = self.is_recording_state
+                    silence_limit = self.silence_timeout
+                    use_vad = self.vad_enabled and (self.vad is not None)
+
+                # --- VAD / Speech Activity Processing ---
+                if use_vad:
+                    prob, is_speech = self.vad.process_chunk(mono_float)
+                    if rec_state:
+                        if is_speech:
+                            self.last_speech_time = now
+                            self.has_spoken_in_recording = True
+                        elif self.has_spoken_in_recording and (now - self.last_speech_time > silence_limit) and (now - self.last_trigger_time > 1.4):
+                            print(f"[WakeWordManager] ⏱️ NEURAL VAD SILENCE DETECTED ({silence_limit}s pause, speech prob: {prob:.3f} < {self.vad.threshold:.2f}) -> Auto-stopping!")
+                            self.has_spoken_in_recording = False
+                            self.last_trigger_time = now
+                            if self.on_stop_detected:
+                                self.on_stop_detected()
+                else:
+                    # Fallback to RMS-based silence detection
+                    rms = float(np.sqrt(np.mean(mono_float ** 2))) if len(mono_float) > 0 else 0.0
+                    if not rec_state:
+                        self.idle_rms_history.append(rms)
+                        if len(self.idle_rms_history) > 60:
+                            self.idle_rms_history.pop(0)
+                    else:
+                        ambient_floor = float(np.median(self.idle_rms_history)) if self.idle_rms_history else 0.005
+                        speech_threshold = max(0.012, ambient_floor * 2.2 + 0.006)
+                        if rms > speech_threshold:
+                            self.last_speech_time = now
+                            self.has_spoken_in_recording = True
+                        elif self.has_spoken_in_recording and (now - self.last_speech_time > silence_limit) and (now - self.last_trigger_time > 1.4):
+                            print(f"[WakeWordManager] ⏱️ ADAPTIVE SILENCE DETECTED ({silence_limit}s pause, RMS: {rms:.4f}) -> Auto-stopping!")
+                            self.has_spoken_in_recording = False
+                            self.last_trigger_time = now
+                            if self.on_stop_detected:
+                                self.on_stop_detected()
+
+                # --- Vosk Keyword Spotting & Partial Recognition ---
+                if rec.AcceptWaveform(pcm16):
+                    result_json = json.loads(rec.Result())
+                    text = result_json.get("text", "").lower()
+                    self._check_text(text)
+                else:
+                    partial_json = json.loads(rec.PartialResult())
+                    partial_text = partial_json.get("partial", "").lower()
+                    if partial_text:
+                        if rec_state:
+                            self.has_spoken_in_recording = True
+                            self.last_speech_time = now
+                        self._check_text(partial_text)
+
         except Exception as e:
             print(f"[WakeWordManager] Stream execution error: {e}")
         finally:
