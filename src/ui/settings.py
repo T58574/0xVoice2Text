@@ -375,72 +375,49 @@ class SettingsDialog(QDialog):
         hk_group.setLayout(hk_layout)
         opts_main_layout.addWidget(hk_group)
 
-        # TTS Engine & Voice Configuration Group
-        tts_group = QGroupBox("СИНТЕЗ РЕЧИ ДЖАРВИСА (TTS)")
-        tts_layout = QVBoxLayout()
-        tts_layout.setSpacing(8)
+        # Procedural Sound Feedback Group
+        sound_group = QGroupBox("ЗВУКОВЫЕ СИГНАЛЫ (ПРОЦЕДУРНЫЕ СТАТУСЫ)")
+        sound_layout = QVBoxLayout()
+        sound_layout.setSpacing(8)
 
-        self.chk_tts_voice = QCheckBox("Включить голосовые ответы ассистента")
-        self.chk_tts_voice.setChecked(self.config.get("tts_voice_enabled", True))
-        tts_layout.addWidget(self.chk_tts_voice)
+        self.chk_sound = QCheckBox("Включить звуковые сигналы статусов (ввод, вывод, ошибка, стоп)")
+        self.chk_sound.setChecked(self.config.get("sound_feedback", True))
+        sound_layout.addWidget(self.chk_sound)
 
-        lbl_tts_engine = QLabel("Движок TTS:")
-        self.combo_tts_engine = QComboBox()
-        tts_engines = [
-            ("[LOCAL] Qwen3-TTS-12Hz (Local SOTA 2026 / Zero-Shot Cloning)", "qwen3"),
-            ("[CLOUD] Edge-TTS (Microsoft Cloud)", "edge")
-        ]
-        curr_tts_engine = self.config.get("tts_engine", "qwen3")
-        tts_eng_idx = 0
-        for i, (lbl, val) in enumerate(tts_engines):
-            self.combo_tts_engine.addItem(lbl, val)
-            if val == curr_tts_engine:
-                tts_eng_idx = i
-        self.combo_tts_engine.setCurrentIndex(tts_eng_idx)
-        tts_layout.addWidget(lbl_tts_engine)
-        tts_layout.addWidget(self.combo_tts_engine)
+        sound_h_layout = QHBoxLayout()
+        lbl_sound_pack = QLabel("Звуковая тема:")
+        self.combo_sound_pack = QComboBox()
+        self.combo_sound_pack.addItem("[SCIFI] Киберпанк / Джарвис (HUD Chimes)", "scifi")
+        self.combo_sound_pack.addItem("[SUBTLE] Мягкие щелчки (Минималистичный)", "subtle")
+        self.combo_sound_pack.addItem("[CLASSIC] Классические сигналы (Beeps)", "classic")
+        curr_pack = self.config.get("sound_pack", "scifi")
+        pack_idx = 0
+        for i in range(self.combo_sound_pack.count()):
+            if self.combo_sound_pack.itemData(i) == curr_pack:
+                pack_idx = i
+                break
+        self.combo_sound_pack.setCurrentIndex(pack_idx)
 
-        lbl_qwen_tts_m = QLabel("Модель Qwen3-TTS:")
-        self.combo_qwen_tts_model = QComboBox()
-        qwen_tts_models = [
-            ("Qwen3-TTS-12Hz-0.6B-Base (Сверхбыстрая / Минимальная задержка)", "Qwen/Qwen3-TTS-12Hz-0.6B-Base"),
-            ("Qwen3-TTS-12Hz-1.7B-CustomVoice (Zero-Shot клонирование тембра)", "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice")
-        ]
-        curr_qwen_tts_m = self.config.get("qwen_tts_model", "Qwen/Qwen3-TTS-12Hz-0.6B-Base")
-        qwen_tts_idx = 0
-        for i, (lbl, val) in enumerate(qwen_tts_models):
-            self.combo_qwen_tts_model.addItem(lbl, val)
-            if val == curr_qwen_tts_m:
-                qwen_tts_idx = i
-        self.combo_qwen_tts_model.setCurrentIndex(qwen_tts_idx)
-        tts_layout.addWidget(lbl_qwen_tts_m)
-        tts_layout.addWidget(self.combo_qwen_tts_model)
+        btn_test_sound = QPushButton("▶ ТЕСТ ЗВУКА")
+        btn_test_sound.setFixedHeight(28)
+        btn_test_sound.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
 
-        tts_h_layout = QHBoxLayout()
-        lbl_tts_voice = QLabel("Облачный голос (Edge):")
-        self.combo_tts_voice = QComboBox()
-        self.combo_tts_voice.addItem("Светлана (Женский)", "ru-RU-SvetlanaNeural")
-        self.combo_tts_voice.addItem("Дмитрий (Мужской)", "ru-RU-DmitryNeural")
-        curr_tts_v = self.config.get("tts_voice", "ru-RU-SvetlanaNeural")
-        self.combo_tts_voice.setCurrentIndex(1 if "Dmitry" in str(curr_tts_v) else 0)
+        def _test_sound_fx():
+            from src.services.sounds import get_sound_fx
+            sfx = get_sound_fx()
+            sfx.set_pack(self.combo_sound_pack.currentData())
+            sfx.play_start()
+            threading.Timer(0.2, sfx.play_success).start()
 
-        lbl_tts_rate = QLabel("Скорость:")
-        self.combo_tts_rate = QComboBox()
-        self.combo_tts_rate.addItem("Нормальная (0%)", "+0%")
-        self.combo_tts_rate.addItem("Быстрая (+20%)", "+20%")
-        self.combo_tts_rate.addItem("Очень быстрая (+35%)", "+35%")
-        curr_tts_r = self.config.get("tts_rate", "+20%")
-        r_idx = 1 if curr_tts_r == "+20%" else (2 if curr_tts_r == "+35%" else 0)
-        self.combo_tts_rate.setCurrentIndex(r_idx)
+        btn_test_sound.clicked.connect(_test_sound_fx)
 
-        tts_h_layout.addWidget(lbl_tts_voice)
-        tts_h_layout.addWidget(self.combo_tts_voice)
-        tts_h_layout.addWidget(lbl_tts_rate)
-        tts_h_layout.addWidget(self.combo_tts_rate)
-        tts_layout.addLayout(tts_h_layout)
+        sound_h_layout.addWidget(lbl_sound_pack)
+        sound_h_layout.addWidget(self.combo_sound_pack)
+        sound_h_layout.addWidget(btn_test_sound)
+        sound_layout.addLayout(sound_h_layout)
 
-        tts_group.setLayout(tts_layout)
-        opts_main_layout.addWidget(tts_group)
+        sound_group.setLayout(sound_layout)
+        opts_main_layout.addWidget(sound_group)
 
         # Additional System Options Group
         sys_group = QGroupBox("ПОВЕДЕНИЕ И ИНТЕРФЕЙС")
@@ -452,106 +429,17 @@ class SettingsDialog(QDialog):
         self.chk_trailing_space = QCheckBox("Добавлять пробел после вставки")
         self.chk_trailing_space.setChecked(self.config.get("add_trailing_space", True))
 
-        self.chk_sound = QCheckBox("Звуковые эффекты старта / стопа записи")
-        self.chk_sound.setChecked(self.config.get("sound_feedback", True))
-
         self.chk_ontop = QCheckBox("Поверх всех окон (Закрепить виджет)")
         self.chk_ontop.setChecked(self.config.get("always_on_top", True))
 
         sys_layout.addWidget(self.chk_auto_paste)
         sys_layout.addWidget(self.chk_trailing_space)
-        sys_layout.addWidget(self.chk_sound)
         sys_layout.addWidget(self.chk_ontop)
         sys_group.setLayout(sys_layout)
         opts_main_layout.addWidget(sys_group)
         opts_main_layout.addStretch()
 
         self.tabs.addTab(tab_options, "[CFG] КЛАВИШИ И ПОВЕДЕНИЕ")
-
-        # TAB 4: AI POST-PROCESSING
-        tab_ai = QWidget()
-        ai_main_layout = QVBoxLayout(tab_ai)
-        ai_main_layout.setSpacing(10)
-
-        ai_mode_group = QGroupBox("РЕЖИМ ОБРАБОТКИ ИИ")
-        ai_mode_layout = QVBoxLayout()
-        ai_mode_layout.setSpacing(8)
-
-        self.combo_ai_mode = QComboBox()
-        self.combo_ai_mode.addItem("[DIRECT] Прямой ввод STT без ИИ", "direct")
-        self.combo_ai_mode.addItem("[CLEAN] Чистка устной речи (Gemma 4 / Flash Lite)", "clean")
-        self.combo_ai_mode.addItem("[SMART] Умная команда / Рерайт (Gemini Flash)", "smart")
-        
-        curr_ai_mode = self.config.get("ai_mode", "direct")
-        mode_idx = 0 if curr_ai_mode == "direct" else (1 if curr_ai_mode == "clean" else 2)
-        self.combo_ai_mode.setCurrentIndex(mode_idx)
-        ai_mode_layout.addWidget(self.combo_ai_mode)
-        ai_mode_group.setLayout(ai_mode_layout)
-        ai_main_layout.addWidget(ai_mode_group)
-
-        # API Key Group
-        api_group = QGroupBox("GOOGLE GEMINI API KEY")
-        api_layout = QVBoxLayout()
-        self.txt_gemini_key = QLineEdit()
-        self.txt_gemini_key.setEchoMode(QLineEdit.EchoMode.PasswordEchoOnEdit)
-        self.txt_gemini_key.setText(self.config.get("gemini_api_key", ""))
-        self.txt_gemini_key.setPlaceholderText("Ключ из Google AI Studio (или добавьте GEMINI_API_KEY в .env)")
-        lbl_api_hint = QLabel("[INFO] Ключ также автоматически подхватывается из файла .env (GEMINI_API_KEY)")
-        lbl_api_hint.setFont(QFont("Consolas", 8))
-        lbl_api_hint.setStyleSheet("color: #71717a;")
-        api_layout.addWidget(self.txt_gemini_key)
-        api_layout.addWidget(lbl_api_hint)
-        api_group.setLayout(api_layout)
-        ai_main_layout.addWidget(api_group)
-
-        # Models Group
-        models_group = QGroupBox("ВЫБОР МОДЕЛЕЙ ИИ")
-        models_layout = QVBoxLayout()
-        models_layout.setSpacing(8)
-
-        clean_m_layout = QHBoxLayout()
-        lbl_clean_m = QLabel("Clean модель (Gemma/Lite):")
-        self.combo_clean_model = QComboBox()
-        self.combo_clean_model.addItem("Gemma 4 31B (14.4k RPD / 30 RPM)", "gemma-4-31b-it")
-        self.combo_clean_model.addItem("Gemma 4 26B (14.4k RPD / 30 RPM)", "gemma-4-26b-a4b-it")
-        self.combo_clean_model.addItem("Gemini 3.5 Flash Lite (500 RPD / 15 RPM)", "gemini-3.5-flash-lite")
-        self.combo_clean_model.addItem("Gemini 3.1 Flash Lite (500 RPD / 15 RPM)", "gemini-3.1-flash-lite")
-        
-        curr_gemma = self.config.get("gemma_model", "gemma-4-31b-it")
-        gemma_idx = 0
-        for i in range(self.combo_clean_model.count()):
-            if self.combo_clean_model.itemData(i) == curr_gemma:
-                gemma_idx = i
-                break
-        self.combo_clean_model.setCurrentIndex(gemma_idx)
-        clean_m_layout.addWidget(lbl_clean_m)
-        clean_m_layout.addWidget(self.combo_clean_model)
-
-        smart_m_layout = QHBoxLayout()
-        lbl_smart_m = QLabel("Smart модель (Gemini Flash):")
-        self.combo_smart_model = QComboBox()
-        self.combo_smart_model.addItem("Gemini 3.6 Flash (20 RPD / 5 RPM)", "gemini-3.6-flash")
-        self.combo_smart_model.addItem("Gemini 3.5 Flash (20 RPD / 5 RPM)", "gemini-3.5-flash")
-        self.combo_smart_model.addItem("Gemini 3.5 Flash Lite (500 RPD / 15 RPM)", "gemini-3.5-flash-lite")
-        self.combo_smart_model.addItem("Gemma 4 31B (14.4k RPD / 30 RPM)", "gemma-4-31b-it")
-
-        curr_gemini = self.config.get("gemini_model", "gemini-3.6-flash")
-        gemini_idx = 0
-        for i in range(self.combo_smart_model.count()):
-            if self.combo_smart_model.itemData(i) == curr_gemini:
-                gemini_idx = i
-                break
-        self.combo_smart_model.setCurrentIndex(gemini_idx)
-        smart_m_layout.addWidget(lbl_smart_m)
-        smart_m_layout.addWidget(self.combo_smart_model)
-
-        models_layout.addLayout(clean_m_layout)
-        models_layout.addLayout(smart_m_layout)
-        models_group.setLayout(models_layout)
-        ai_main_layout.addWidget(models_group)
-        ai_main_layout.addStretch()
-
-        self.tabs.addTab(tab_ai, "[AI] ИИ (GEMINI / GEMMA)")
 
         main_layout.addWidget(self.tabs)
 
@@ -595,16 +483,8 @@ class SettingsDialog(QDialog):
                 "auto_paste": self.chk_auto_paste.isChecked(),
                 "add_trailing_space": self.chk_trailing_space.isChecked(),
                 "sound_feedback": self.chk_sound.isChecked(),
-                "tts_voice_enabled": self.chk_tts_voice.isChecked(),
-                "tts_engine": self.combo_tts_engine.currentData(),
-                "qwen_tts_model": self.combo_qwen_tts_model.currentData(),
-                "tts_voice": self.combo_tts_voice.currentData(),
-                "tts_rate": self.combo_tts_rate.currentData(),
+                "sound_pack": self.combo_sound_pack.currentData(),
                 "always_on_top": self.chk_ontop.isChecked(),
-                "ai_mode": self.combo_ai_mode.currentData(),
-                "gemini_api_key": self.txt_gemini_key.text().strip(),
-                "gemma_model": self.combo_clean_model.currentData(),
-                "gemini_model": self.combo_smart_model.currentData(),
             }
 
             # Single atomic write to disk

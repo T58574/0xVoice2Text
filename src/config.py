@@ -28,6 +28,8 @@ DEFAULT_CONFIG = {
     "auto_paste": True,
     "add_trailing_space": True,
     "sound_feedback": True,
+    "sound_pack": "scifi",           # scifi (Cyberpunk HUD), subtle, classic
+    "sound_volume": 0.28,
     "always_on_top": True,
     "widget_opacity": 0.92,
     "theme": "cyberpunk_dark",

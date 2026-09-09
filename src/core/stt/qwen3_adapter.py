@@ -6,6 +6,7 @@ import numpy as np
 
 from src.core.logger import logger
 from src.core.stt.base import BaseSTTAdapter
+from src.core.stt.qwen3_onnx_adapter import resolve_qwen_language
 
 class Qwen3ASRAdapter(BaseSTTAdapter):
     """
@@ -149,9 +150,7 @@ class Qwen3ASRAdapter(BaseSTTAdapter):
             if len(audio_data.shape) > 1:
                 audio_data = audio_data.mean(axis=1)
 
-            target_lang = language or self.language
-            if target_lang == "auto":
-                target_lang = "ru"
+            target_lang = resolve_qwen_language(language or self.language)
 
             logger.info(f"[Qwen3ASR] Processing audio ({len(audio_data)/sample_rate:.2f}s) with {self.model_name}...")
 

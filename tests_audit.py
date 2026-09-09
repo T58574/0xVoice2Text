@@ -26,17 +26,12 @@ def test_all():
     assert sanitized == "calc.exe  notepad.exe  whoami"
     print(f"    [+] Macro Manager injection defense OK")
 
-    print("[3] Checking TTS Echo Logic (No false-positive speech suppression)...")
-    tts = JarvisVoiceService(cfg)
-    # When not speaking:
-    assert not tts.is_jarvis_phrase("слушаю"), "Must not suppress when not speaking"
-    assert not tts.is_jarvis_phrase("я слушаю лекцию"), "Must not suppress substring"
-    # When speaking:
-    tts.is_speaking_flag = True
-    assert tts.is_jarvis_phrase("слушаю"), "Must suppress exact preset phrase when speaking"
-    assert not tts.is_jarvis_phrase("я слушаю доклад"), "Must NOT suppress speech containing preset as substring"
-    tts.is_speaking_flag = False
-    print(f"    [+] TTS Echo Filter OK (Strict exact matching only when speaking)")
+    print("[3] Checking Procedural Sound Feedback Subsystem...")
+    from src.services.sounds import SoundEffects
+    sfx = SoundEffects(cfg)
+    assert "start" in sfx._buffers and "success" in sfx._buffers and "error" in sfx._buffers
+    assert len(sfx._buffers["start"]) > 0 and len(sfx._buffers["success"]) > 0
+    print(f"    [+] Procedural Sound Feedback OK (In-memory buffers, 0ms latency, zero TTS overhead)")
 
     print("[4] Checking Hotkeys Thread Safety...")
     hk = HotkeyManager("ctrl+space")

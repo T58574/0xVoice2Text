@@ -22,6 +22,45 @@ def get_input_devices():
         print(f"[AudioRecorder] Error listing input devices: {e}")
     return devices
 
+def check_microphone_available(device_id=None) -> tuple[bool, str, str]:
+    """
+    Validates whether the requested (or default) microphone device is available and operational.
+    Returns: (is_available: bool, device_name: str, error_message: str)
+    """
+    try:
+        devices = sd.query_devices()
+        if not devices:
+            return False, "None", "В системе не обнаружено аудиоустройств ввода (микрофонов)."
+
+        target_idx = device_id
+        if target_idx is None:
+            def_in = sd.default.device[0]
+            if def_in is None or def_in < 0:
+                input_devs = [i for i, d in enumerate(devices) if d.get('max_input_channels', 0) > 0]
+                if not input_devs:
+                    return False, "None", "В системе не найдено доступных микрофонов."
+                target_idx = input_devs[0]
+            else:
+                target_idx = def_in
+
+        if isinstance(target_idx, int) and (target_idx < 0 or target_idx >= len(devices)):
+            return False, f"Device #{target_idx}", f"Устройство с индексом #{target_idx} не найдено."
+
+        dev_info = sd.query_devices(target_idx)
+        if dev_info.get('max_input_channels', 0) <= 0:
+            return False, str(dev_info.get('name', target_idx)), "Выбранное устройство не имеет каналов ввода звука."
+
+        dev_name = dev_info.get('name', f"Device #{target_idx}")
+
+        # Quick test opening input stream to ensure no exclusive lock or permission block
+        with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype='float32', device=target_idx):
+            pass
+
+        return True, dev_name, "OK"
+    except Exception as e:
+        err_msg = str(e)
+        return False, f"Device {device_id if device_id is not None else 'Default'}", err_msg
+
 class AudioRecorder:
     def __init__(self, device_id=None):
         self.device_id = device_id
@@ -32,6 +71,11 @@ class AudioRecorder:
         self._lock = threading.Lock()
         self.current_rms = 0.0
         self.tts_speaking_checker = None
+        self.last_error = None
+
+    def check_availability(self) -> tuple[bool, str, str]:
+        """Checks if the currently configured audio device is available."""
+        return check_microphone_available(self.device_id)
 
     def set_device(self, device_id):
         self.device_id = device_id
@@ -55,13 +99,14 @@ class AudioRecorder:
                 rms = float(np.sqrt(np.mean(mono_data ** 2))) if len(mono_data) > 0 else 0.0
                 self.current_rms = rms
 
-    def start_recording(self):
+    def start_recording(self) -> bool:
         with self._lock:
             if self.is_recording:
-                return
+                return True
             self.is_recording = True
             self.audio_chunks = []
             self.current_rms = 0.0
+            self.last_error = None
 
         try:
             device = self.device_id if self.device_id is not None else None
@@ -73,10 +118,15 @@ class AudioRecorder:
                 callback=self._audio_callback
             )
             self.stream.start()
-            print(f"[AudioRecorder] Started recording on device {device}")
+            print(f"[AudioRecorder] [OK] Started recording on device {device}")
+            return True
         except Exception as e:
-            print(f"[AudioRecorder] Failed to start recording stream: {e}")
-            self.is_recording = False
+            err_msg = str(e)
+            print(f"[AudioRecorder] [FAIL] Failed to start recording stream: {err_msg}")
+            with self._lock:
+                self.is_recording = False
+                self.last_error = err_msg
+            return False
 
     def stop_recording(self):
         with self._lock:

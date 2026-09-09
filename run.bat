@@ -51,13 +51,23 @@ if "%~1"=="-c" goto :run_debug
 
 :: Standard background launch (windowless via pythonw)
 echo [*] Launching 0xVoice2Text Widget in background...
+if exist "%~dp0crash.log" del /f /q "%~dp0crash.log" >nul 2>&1
 start "" "%PYW_EXE%" main.py
 if %errorlevel% neq 0 (
     echo [WARN] pythonw failed to spawn. Falling back to foreground console mode...
     goto :run_debug
 )
-echo [OK] 0xVoice2Text started successfully.
 ping 127.0.0.1 -n 2 >nul 2>&1
+if exist "%~dp0crash.log" (
+    echo.
+    echo [CRIT] Application crashed during startup!
+    echo ===================================================
+    type "%~dp0crash.log"
+    echo ===================================================
+    pause
+    exit /b 1
+)
+echo [OK] 0xVoice2Text started successfully.
 exit /b 0
 
 :run_debug

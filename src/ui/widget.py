@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (
     QApplication, QWidget, QLabel, QHBoxLayout, QVBoxLayout, QPushButton,
     QFrame, QGraphicsDropShadowEffect, QScrollArea, QListWidget, QListWidgetItem
 )
-from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal, QSize
+from PyQt6.QtCore import Qt, QTimer, QPoint, pyqtSignal, QSize, QEvent
 from PyQt6.QtGui import QColor, QFont, QPainter, QBrush, QPen, QLinearGradient, QCursor
 
 class SciFiWaveVisualizer(QWidget):
@@ -216,6 +216,8 @@ class DesktopWidget(QWidget):
     open_settings_signal = pyqtSignal()
     reinject_text_signal = pyqtSignal(str)
     ai_mode_changed_signal = pyqtSignal(str)
+    recheck_mic_signal = pyqtSignal()
+    exit_app_signal = pyqtSignal()
 
     def __init__(self, config, history_mgr=None):
         super().__init__()
@@ -237,6 +239,7 @@ class DesktopWidget(QWidget):
         flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint
         self.setWindowFlags(flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setWindowTitle("0xVoice2Text_Widget")
 
     def center_on_screen(self):
         screen = QApplication.primaryScreen()
@@ -247,7 +250,7 @@ class DesktopWidget(QWidget):
             self.move(frame_geo.topLeft())
 
     def init_ui(self):
-        self.setFixedWidth(350)
+        self.setFixedWidth(410)
         self.setFixedHeight(70)
 
         main_v_layout = QVBoxLayout(self)
@@ -256,6 +259,7 @@ class DesktopWidget(QWidget):
 
         self.main_frame = QFrame(self)
         self.main_frame.setFixedHeight(64)
+        self.main_frame.setCursor(QCursor(Qt.CursorShape.SizeAllCursor))
         self.main_frame.setStyleSheet("""
             QFrame {
                 background: #000000;
@@ -275,6 +279,7 @@ class DesktopWidget(QWidget):
         layout.setSpacing(10)
 
         self.visualizer = SciFiWaveVisualizer(self.main_frame)
+        self.visualizer.setCursor(QCursor(Qt.CursorShape.SizeAllCursor))
         layout.addWidget(self.visualizer)
 
         mid_layout = QVBoxLayout()
@@ -282,10 +287,16 @@ class DesktopWidget(QWidget):
 
         self.lbl_status = QLabel("READY")
         self.lbl_status.setFont(QFont("Consolas", 11, QFont.Weight.Bold))
+        self.lbl_status.setCursor(QCursor(Qt.CursorShape.SizeAllCursor))
         self.lbl_status.setStyleSheet("color: #ffffff; border: none; background: transparent; letter-spacing: 0.5px;")
+
+        badges_layout = QHBoxLayout()
+        badges_layout.setSpacing(4)
+        badges_layout.setContentsMargins(0, 0, 0, 0)
 
         self.lbl_hotkey = QLabel(f"HOLD [{self.config.get('hotkey', 'caps_lock').upper()}]")
         self.lbl_hotkey.setFont(QFont("Consolas", 8, QFont.Weight.Bold))
+        self.lbl_hotkey.setCursor(QCursor(Qt.CursorShape.SizeAllCursor))
         self.lbl_hotkey.setStyleSheet("""
             background: #09090b;
             color: #a1a1aa;
@@ -294,8 +305,34 @@ class DesktopWidget(QWidget):
             border: 1px solid #27272a;
         """)
 
+        self.btn_mic = QPushButton("MIC: ...", self.main_frame)
+        self.btn_mic.setFont(QFont("Consolas", 8, QFont.Weight.Bold))
+        self.btn_mic.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_mic.setToolTip("Микрофон: Проверка статуса... (Нажмите для проверки)")
+        self.btn_mic.setStyleSheet("""
+            QPushButton {
+                background: #18181b;
+                color: #a1a1aa;
+                border-radius: 3px;
+                padding: 1px 5px;
+                border: 1px solid #3f3f46;
+                font-family: 'Consolas', sans-serif;
+                font-size: 8px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: #27272a;
+                color: #ffffff;
+            }
+        """)
+        self.btn_mic.clicked.connect(self.recheck_mic_signal.emit)
+
+        badges_layout.addWidget(self.lbl_hotkey)
+        badges_layout.addWidget(self.btn_mic)
+        badges_layout.addStretch()
+
         mid_layout.addWidget(self.lbl_status)
-        mid_layout.addWidget(self.lbl_hotkey)
+        mid_layout.addLayout(badges_layout)
         layout.addLayout(mid_layout)
 
         layout.addStretch()
@@ -337,21 +374,52 @@ class DesktopWidget(QWidget):
         self.btn_settings.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.btn_settings.clicked.connect(self.open_settings_signal.emit)
 
+        self.btn_min = QPushButton("─", self.main_frame)
+        self.btn_min.setStyleSheet(cyber_btn_style)
+        self.btn_min.setToolTip("Свернуть в трей (горячая клавиша останется активной)")
+        self.btn_min.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_min.clicked.connect(self.hide)
+
+        close_btn_style = """
+            QPushButton {
+                background: #000000;
+                color: #a1a1aa;
+                border: 1px solid #27272a;
+                font-family: 'Consolas', sans-serif;
+                font-size: 10px;
+                font-weight: bold;
+                border-radius: 4px;
+                padding: 3px 6px;
+            }
+            QPushButton:hover {
+                color: #ffffff;
+                background: #dc2626;
+                border-color: #dc2626;
+            }
+        """
         self.btn_close = QPushButton("✕", self.main_frame)
-        self.btn_close.setStyleSheet(cyber_btn_style)
-        self.btn_close.setToolTip("Свернуть в трей")
+        self.btn_close.setStyleSheet(close_btn_style)
+        self.btn_close.setToolTip("Закрыть приложение и завершить процесс")
         self.btn_close.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.btn_close.clicked.connect(self.hide)
+        self.btn_close.clicked.connect(self.request_exit)
 
         btn_layout.addWidget(self.btn_mode)
         btn_layout.addWidget(self.btn_hist)
         btn_layout.addWidget(self.btn_settings)
+        btn_layout.addWidget(self.btn_min)
         btn_layout.addWidget(self.btn_close)
         layout.addLayout(btn_layout)
 
         self.update_ai_mode_badge()
 
         main_v_layout.addWidget(self.main_frame)
+
+        # Install event filter on draggable elements for smooth native movement
+        self.installEventFilter(self)
+        self.main_frame.installEventFilter(self)
+        self.lbl_status.installEventFilter(self)
+        self.lbl_hotkey.installEventFilter(self)
+        self.visualizer.installEventFilter(self)
 
         if self.history_mgr:
             self.history_drawer = CyberpunkHistoryDrawer(self.history_mgr, self)
@@ -546,9 +614,92 @@ class DesktopWidget(QWidget):
         """)
         QTimer.singleShot(1800, self.set_state_idle)
 
-    # Mouse drag handlers
+    def set_mic_status(self, is_ok: bool, device_name: str, error_msg: str = ""):
+        """Updates the microphone status badge and tooltip."""
+        if not hasattr(self, 'btn_mic') or not self.btn_mic:
+            return
+        if is_ok:
+            self.btn_mic.setText("MIC: OK")
+            self.btn_mic.setStyleSheet("""
+                QPushButton {
+                    background: #052e16;
+                    color: #4ade80;
+                    border-radius: 3px;
+                    padding: 1px 5px;
+                    border: 1px solid #16a34a;
+                    font-family: 'Consolas', sans-serif;
+                    font-size: 8px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background: #16a34a;
+                    color: #000000;
+                }
+            """)
+            self.btn_mic.setToolTip(f"Микрофон: {device_name} [ГОТОВ К ЗАПИСИ]\nНажмите для повторной проверки")
+        else:
+            self.btn_mic.setText("NO MIC")
+            self.btn_mic.setStyleSheet("""
+                QPushButton {
+                    background: #450a0a;
+                    color: #f87171;
+                    border-radius: 3px;
+                    padding: 1px 5px;
+                    border: 1px solid #dc2626;
+                    font-family: 'Consolas', sans-serif;
+                    font-size: 8px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background: #dc2626;
+                    color: #ffffff;
+                }
+            """)
+            self.btn_mic.setToolTip(f"Микрофон НЕДОСТУПЕН!\n{error_msg}\nНажмите для повторной проверки или откройте Настройки (⚙)")
+
+    def request_exit(self):
+        """Emits application exit signal to terminate the entire process."""
+        self.exit_app_signal.emit()
+
+    def closeEvent(self, event):
+        """Clean shutdown when widget window receives a close event."""
+        self.exit_app_signal.emit()
+        event.accept()
+
+    # Event filter for seamless native window dragging
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Type.MouseButtonPress:
+            if event.button() == Qt.MouseButton.LeftButton:
+                # Do not intercept button clicks
+                if isinstance(watched, QPushButton):
+                    return super().eventFilter(watched, event)
+
+                # Attempt native OS system move (Windows HTCAPTION)
+                wh = self.windowHandle()
+                if wh and hasattr(wh, "startSystemMove") and wh.startSystemMove():
+                    return True
+
+                # Fallback to manual delta drag
+                self.is_dragging = True
+                self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                return True
+        elif event.type() == QEvent.Type.MouseMove:
+            if self.is_dragging and event.buttons() == Qt.MouseButton.LeftButton:
+                self.move(event.globalPosition().toPoint() - self.drag_position)
+                return True
+        elif event.type() == QEvent.Type.MouseButtonRelease:
+            if self.is_dragging:
+                self.is_dragging = False
+                return True
+        return super().eventFilter(watched, event)
+
+    # Mouse drag handlers on the widget itself
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
+            wh = self.windowHandle()
+            if wh and hasattr(wh, "startSystemMove") and wh.startSystemMove():
+                event.accept()
+                return
             self.is_dragging = True
             self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             event.accept()

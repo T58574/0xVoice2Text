@@ -112,15 +112,11 @@ class STTEngine:
             if on_complete:
                 on_complete(False)
 
-    def change_model(
-        self,
-        model_size: str = "Qwen/Qwen3-ASR-1.7B-hf",
-        language: str = "ru",
-        device: str = "auto",
-        on_complete: Optional[Callable[[bool], None]] = None
-    ) -> None:
-        self.switch_engine(
-            self.engine_name,
-            options={"qwen_model": model_size, "stt_device": device, "language": language if language != "auto" else "ru"},
-            on_complete=on_complete
-        )
+    def unload(self) -> None:
+        """Unloads underlying adapter and frees model memory / VRAM."""
+        with self._lock:
+            if self.adapter:
+                try:
+                    self.adapter.unload()
+                except Exception as e:
+                    logger.warning(f"[STTEngine] Error unloading adapter: {e}")

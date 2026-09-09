@@ -43,7 +43,7 @@ from src.core.ipc_bus import IPCEventBus
 from src.services.hotkeys import HotkeyManager
 from src.services.macros import MacroManager
 from src.services.injector import TextInjector
-from src.services.tts import JarvisVoiceService
+from src.services.sounds import get_sound_fx, SoundEffects
 from src.core.logger import logger
 from src.ui.widget import DesktopWidget
 from src.ui.settings import SettingsDialog
@@ -56,28 +56,33 @@ class SignalBridge(QObject):
     recording_started = pyqtSignal()
     recording_stopped = pyqtSignal()
     transcription_done = pyqtSignal(str)
-    ai_done = pyqtSignal(str)
-    ai_error = pyqtSignal(str)
     model_loaded = pyqtSignal(bool)
+    mic_status_changed = pyqtSignal(bool, str, str)
 
 class ApplicationController:
-    def __init__(self):
+    def __init__(self, single_instance_mutex=None):
+        self._single_instance_mutex = single_instance_mutex
+        self._is_shutting_down = False
         self.app = QApplication(sys.argv)
         self.app.setQuitOnLastWindowClosed(False)
 
         self.config = AppConfig()
         self.history_mgr = HistoryManager()
         self.ipc = IPCEventBus()
-        self.tts = JarvisVoiceService(self.config)
+        self.sound_fx = get_sound_fx(self.config)
+        self.tts = self.sound_fx  # Backwards compatibility alias
         self.bridge = SignalBridge()
+
+        # Microphone State Tracking
+        self.mic_available = False
+        self.mic_name = "Checking..."
+        self.mic_error = ""
 
         # Audio Recorder
         self.recorder = AudioRecorder(device_id=self.config.get("audio_device"))
-        self.recorder.set_tts_speaking_checker(self.tts.is_speaking)
 
-        # STT & AI Engine
+        # STT Engine (Local SOTA DirectML GPU / AVX2)
         self.stt = STTEngine(config=self.config)
-        self.ai_engine = AIEngine(self.config)
 
         # Mouse Cursor Holographic HUD Overlay
         self.mouse_hud = MouseHUDOverlay()
@@ -87,6 +92,8 @@ class ApplicationController:
         self.widget.set_rms_provider(self.recorder.get_rms)
         self.widget.open_settings_signal.connect(self.open_settings)
         self.widget.reinject_text_signal.connect(self.reinject_text)
+        self.widget.recheck_mic_signal.connect(self.check_mic_status_async)
+        self.widget.exit_app_signal.connect(self.exit_app)
         self.widget.btn_hist.clicked.disconnect() # Connect HIST button directly to open dedicated History Window!
         self.widget.btn_hist.clicked.connect(self.open_history)
         self.widget.show()
@@ -99,9 +106,11 @@ class ApplicationController:
         self.bridge.recording_started.connect(self._on_ui_recording_started)
         self.bridge.recording_stopped.connect(self._on_ui_recording_stopped)
         self.bridge.transcription_done.connect(self._on_ui_transcription_done)
-        self.bridge.ai_done.connect(self._finalize_text_injection)
-        self.bridge.ai_error.connect(self._on_ai_error)
         self.bridge.model_loaded.connect(self._on_model_loaded)
+        self.bridge.mic_status_changed.connect(self.widget.set_mic_status)
+
+        # Check initial microphone availability
+        self.check_mic_status_async()
 
         # Hotkey Manager
         self.hotkey_mgr = HotkeyManager(
@@ -114,7 +123,7 @@ class ApplicationController:
         # Wake Word & Voice Stop Manager (Vosk)
         self.wake_mgr = WakeWordManager(
             config=self.config,
-            on_wake_detected=self.on_hotkey_start,
+            on_wake_detected=self.on_wake_word_detected,
             on_stop_detected=self.on_hotkey_stop
         )
 
@@ -142,12 +151,33 @@ class ApplicationController:
         self.hotkey_mgr.start()
         self.wake_mgr.start()
 
+    def check_mic_status_async(self):
+        """Asynchronously validates microphone hardware accessibility without blocking Qt UI."""
+        def _worker():
+            ok, name, err = self.recorder.check_availability()
+            self.mic_available = ok
+            self.mic_name = name
+            self.mic_error = err
+            if ok:
+                logger.info(f"[Main] [MIC] [OK] Microphone operational: '{name}'")
+            else:
+                logger.warning(f"[Main] [MIC] [WARN] Microphone unavailable: '{name}' | Error: {err}")
+            self.bridge.mic_status_changed.emit(ok, name, err)
+
+        threading.Thread(target=_worker, daemon=True).start()
+
     def _on_model_loaded(self, success):
         if success:
             self.widget.set_state_idle("READY")
         else:
             status = self.stt.status_message if self.stt else "STT ERROR"
             self.widget.set_state_idle(status[:14])
+
+    def on_wake_word_detected(self):
+        """Triggered when WakeWordManager detects wake trigger phrase ('джарвис')."""
+        if self.config.get("sound_feedback", True):
+            self.sound_fx.play_wake()
+        self.on_hotkey_start()
 
     def on_hotkey_start(self):
         if self.is_transcribing:
@@ -157,6 +187,17 @@ class ApplicationController:
             logger.warning(f"[Main] Hotkey ignored: STT engine is not ready ({status})")
             if hasattr(self, 'widget') and self.widget:
                 self.widget.set_state_idle(status[:14])
+            return
+        if not self.mic_available:
+            logger.warning(f"[Main] Hotkey ignored: Microphone '{self.mic_name}' is not available.")
+            if hasattr(self, 'widget') and self.widget:
+                self.widget.set_state_idle("NO MIC")
+            self.sound_fx.play_error()
+            self.show_error_dialog(
+                title="Микрофон недоступен",
+                error_msg=f"Устройство ввода '{self.mic_name}' недоступно или отключено.\n\nОшибка: {self.mic_error}",
+                solution_hint="Проверьте подключение микрофона и выберите правильное устройство в Настройках (⚙) -> Audio Device."
+            )
             return
         self.bridge.recording_started.emit()
 
@@ -171,9 +212,17 @@ class ApplicationController:
         self.mouse_hud.trigger_around_cursor(duration_ms=1500)
 
         if self.config.get("sound_feedback", True):
-            self.tts.play_category("listening")
+            self.sound_fx.play_start()
         self.widget.set_state_recording()
-        self.recorder.start_recording()
+        started = self.recorder.start_recording()
+        if not started:
+            self.widget.set_state_idle("MIC FAIL")
+            self.sound_fx.play_error()
+            self.show_error_dialog(
+                title="Ошибка записи аудио",
+                error_msg=f"Не удалось запустить аудиопоток с микрофона: {self.recorder.last_error}",
+                solution_hint="Убедитесь, что микрофон не занят другим приложением в эксклюзивном режиме."
+            )
 
     def _on_ui_recording_stopped(self):
         # Notify wake manager recording state
@@ -182,6 +231,8 @@ class ApplicationController:
         audio_buffer = self.recorder.stop_recording()
         if audio_buffer is None or len(audio_buffer) < 1600:
             self.widget.set_state_idle("READY")
+            if self.config.get("sound_feedback", True):
+                self.sound_fx.play_stop()
             return
 
         self.widget.set_state_transcribing()
@@ -197,24 +248,18 @@ class ApplicationController:
         self.is_transcribing = False
         if not text or text.startswith("ERR") or text.startswith("ERROR"):
             self.widget.set_state_idle("ERR: STT")
-            self.tts.play_category("error")
+            self.sound_fx.play_error()
             engine_name = self.stt.adapter.get_name() if self.stt and self.stt.adapter else "STT Engine"
             self.show_error_dialog(
                 title=f"Ошибка {engine_name}",
                 error_msg=text if text else "Неизвестная ошибка распознавания речи.",
-                solution_hint="Проверьте конфигурацию STT движка в настройках (Settings) или подключение к API / VRAM."
+                solution_hint="Проверьте конфигурацию STT движка в настройках (Settings) или подключение к микрофону / VRAM."
             )
             return
 
         # Clean trailing stop words if present
         text = self.wake_mgr.clean_transcription(text)
         if not text:
-            self.widget.set_state_idle("READY")
-            return
-
-        # Ignore self-echo of Jarvis's own TTS response phrases
-        if self.tts.is_jarvis_phrase(text):
-            logger.info(f"[Main] [FILTER] Filtered out self-echo Jarvis voice phrase: '{text}'")
             self.widget.set_state_idle("READY")
             return
 
@@ -227,40 +272,18 @@ class ApplicationController:
 
             self.ipc.emit_transcription_event(
                 text=f"[CMD] {text} -> {macro_desc}",
-                engine="groq-whisper-large-v3",
+                engine="qwen3-asr",
                 language=self.config.get("language", "ru")
             )
 
             if self.config.get("sound_feedback", True):
-                self.tts.play_category("macro")
+                self.sound_fx.play_macro()
 
             self.widget.set_state_inserted(f"[CMD] {macro_desc}")
             return
 
-        # Check AI Processing Mode
-        ai_mode = self.config.get("ai_mode", "direct")
-        if ai_mode in ("clean", "smart"):
-            self.widget.set_state_ai_thinking(ai_mode)
-            def _ai_worker():
-                processed_text, err_msg = self.ai_engine.process_text(text, mode=ai_mode)
-                if err_msg:
-                    self.bridge.ai_error.emit(err_msg)
-                    # Also fallback to injecting raw transcript if available
-                    self.bridge.ai_done.emit(processed_text)
-                else:
-                    self.bridge.ai_done.emit(processed_text)
-            threading.Thread(target=_ai_worker, daemon=True).start()
-        else:
-            self._finalize_text_injection(text)
-
-    def _on_ai_error(self, err_msg: str):
-        self.widget.set_state_idle("ERR: GEMINI")
-        self.tts.play_category("error")
-        self.show_error_dialog(
-            title="Ошибка Google Gemini / Gemma API",
-            error_msg=err_msg,
-            solution_hint="Укажите действительный GEMINI_API_KEY в файле .env или переключите модель/режим в настройках."
-        )
+        # Direct Voice to Text Injection (Optimized, 0 external API calls)
+        self._finalize_text_injection(text)
 
     def show_error_dialog(self, title: str, error_msg: str, solution_hint: str = ""):
         logger.error(f"[Main] Showing Error Dialog: {title} | Details: {error_msg}")
@@ -286,7 +309,7 @@ class ApplicationController:
         # 2. Emit JSON event for IPC external infrastructure
         self.ipc.emit_transcription_event(
             text=text,
-            engine="groq-whisper-large-v3",
+            engine="qwen3-asr",
             language=self.config.get("language", "ru")
         )
 
@@ -297,7 +320,7 @@ class ApplicationController:
                 add_trailing_space=self.config.get("add_trailing_space", True)
             )
             if success and self.config.get("sound_feedback", True):
-                self.tts.play_category("success")
+                self.sound_fx.play_success()
 
         self.widget.set_state_inserted(text)
 
@@ -308,7 +331,7 @@ class ApplicationController:
             add_trailing_space=self.config.get("add_trailing_space", True)
         )
         if success and self.config.get("sound_feedback", True):
-            self.tts.play_category("success")
+            self.sound_fx.play_success()
         self.widget.set_state_inserted("PASTED")
 
     def open_history(self):
@@ -334,6 +357,7 @@ class ApplicationController:
         # --- Lightweight config applications (safe, fast) ---
         try:
             self.recorder.set_device(self.config.get("audio_device"))
+            self.check_mic_status_async()
         except Exception as e:
             logger.error(f"[Main] Failed to update audio device: {e}")
 
@@ -373,32 +397,144 @@ class ApplicationController:
                 logger.error(f"[Main] Failed to switch STT engine: {e}")
                 self.bridge.model_loaded.emit(False)
 
-        def _reload_tts():
-            try:
-                tts_opts = {
-                    "qwen_tts_model": self.config.get("qwen_tts_model", "Qwen/Qwen3-TTS-12Hz-0.6B-Base"),
-                    "tts_ref_voice": self.config.get("tts_ref_voice", None),
-                    "tts_device": self.config.get("tts_device", "auto"),
-                    "tts_voice": self.config.get("tts_voice", "ru-RU-SvetlanaNeural"),
-                    "tts_rate": self.config.get("tts_rate", "+20%"),
-                    "tts_pitch": self.config.get("tts_pitch", "+0Hz")
-                }
-                self.tts.switch_engine(self.config.get("tts_engine", "qwen3"), options=tts_opts)
-            except Exception as e:
-                logger.error(f"[Main] Failed to switch TTS engine: {e}")
+        try:
+            self.sound_fx.reload_config(self.config)
+        except Exception as e:
+            logger.error(f"[Main] Failed to reload sound feedback config: {e}")
 
         threading.Thread(target=_reload_stt, daemon=True).start()
-        threading.Thread(target=_reload_tts, daemon=True).start()
 
     def exit_app(self):
-        self.hotkey_mgr.stop()
-        self.wake_mgr.stop()
-        self.recorder.stop_recording()
+        if self._is_shutting_down:
+            return
+        self._is_shutting_down = True
+
+        logger.info("[Main] [EXIT] Graceful shutdown initiated...")
+
+        # 1. Stop background listeners and audio streams
+        try:
+            self.hotkey_mgr.stop()
+        except Exception as e:
+            logger.error(f"[Main] [EXIT] Error stopping hotkey manager: {e}")
+
+        try:
+            self.wake_mgr.stop()
+        except Exception as e:
+            logger.error(f"[Main] [EXIT] Error stopping wake manager: {e}")
+
+        try:
+            self.recorder.stop_recording()
+        except Exception as e:
+            logger.error(f"[Main] [EXIT] Error stopping audio recorder: {e}")
+
+        # 2. Unload STT & TTS models to free VRAM/RAM immediately
+        try:
+            if hasattr(self, 'stt') and self.stt:
+                self.stt.unload()
+        except Exception as e:
+            logger.error(f"[Main] [EXIT] Error unloading STT: {e}")
+
+        try:
+            if hasattr(self, 'tts') and self.tts:
+                self.tts.unload()
+        except Exception as e:
+            logger.error(f"[Main] [EXIT] Error unloading TTS: {e}")
+
+        # 3. Clean up UI elements & tray icon
+        try:
+            if hasattr(self, 'tray') and self.tray and self.tray.tray:
+                self.tray.tray.hide()
+        except Exception as e:
+            logger.error(f"[Main] [EXIT] Error hiding tray: {e}")
+
+        try:
+            if hasattr(self, 'mouse_hud') and self.mouse_hud:
+                self.mouse_hud.close()
+            if hasattr(self, 'history_window') and self.history_window:
+                self.history_window.close()
+            if hasattr(self, 'settings_dialog') and self.settings_dialog:
+                self.settings_dialog.close()
+            if hasattr(self, 'widget') and self.widget:
+                self.widget.close()
+        except Exception as e:
+            logger.error(f"[Main] [EXIT] Error closing windows: {e}")
+
+        # 4. Release single instance mutex handle
+        if hasattr(self, '_single_instance_mutex') and self._single_instance_mutex:
+            try:
+                import ctypes
+                ctypes.windll.kernel32.CloseHandle(self._single_instance_mutex)
+                self._single_instance_mutex = None
+            except Exception:
+                pass
+
+        logger.info("[Main] [EXIT] Shutdown complete. Terminating process.")
         self.app.quit()
+        # Guarantee that C-threads (PortAudio, DirectML, Vosk) don't keep Python alive in Task Manager
+        os._exit(0)
 
     def run(self):
         return self.app.exec()
 
+def acquire_single_instance_mutex():
+    """
+    Ensures only a single instance of 0xVoice2Text runs on Windows.
+    If an existing instance is found, brings it to foreground and returns None.
+    """
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        user32 = ctypes.windll.user32
+        ERROR_ALREADY_EXISTS = 183
+        MUTEX_NAME = "Global\\0xVoice2Text_SingleInstance_Mutex_v1"
+
+        mutex = kernel32.CreateMutexW(None, False, MUTEX_NAME)
+        last_error = kernel32.GetLastError()
+
+        if last_error == ERROR_ALREADY_EXISTS:
+            logger.warning("[Main] [SYS] Another instance of 0xVoice2Text is already running. Focusing existing window and exiting.")
+            hwnd = user32.FindWindowW(None, "0xVoice2Text_Widget")
+            if hwnd:
+                user32.ShowWindow(hwnd, 9) # SW_RESTORE
+                user32.SetForegroundWindow(hwnd)
+            kernel32.CloseHandle(mutex)
+            return None
+        return mutex
+    except Exception as e:
+        logger.error(f"[Main] [SYS] Single instance mutex check failed: {e}")
+        return None
+
+def _global_excepthook(exctype, value, tb):
+    import traceback
+    err_text = "".join(traceback.format_exception(exctype, value, tb))
+    logger.critical(f"[CRITICAL UNCAUGHT EXCEPTION]\n{err_text}")
+    try:
+        crash_log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "crash.log")
+        with open(crash_log_path, "w", encoding="utf-8") as f:
+            f.write(err_text)
+    except Exception:
+        pass
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(
+            0,
+            f"0xVoice2Text encountered a critical error:\n\n{value}\n\nSee crash.log for full traceback.",
+            "0xVoice2Text Error",
+            0x10 # MB_ICONERROR
+        )
+    except Exception:
+        pass
+    sys.__excepthook__(exctype, value, tb)
+
+sys.excepthook = _global_excepthook
+
 if __name__ == "__main__":
-    controller = ApplicationController()
-    sys.exit(controller.run())
+    try:
+        mutex = acquire_single_instance_mutex()
+        if mutex is None:
+            sys.exit(0)
+
+        controller = ApplicationController(single_instance_mutex=mutex)
+        sys.exit(controller.run())
+    except Exception as e:
+        _global_excepthook(*sys.exc_info())

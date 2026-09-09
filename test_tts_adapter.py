@@ -6,36 +6,42 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-from src.services.tts.factory import TTSFactory
+from src.services.sounds import SoundEffects, get_sound_fx
 from src.services.tts import JarvisVoiceService
 from src.config import AppConfig
 
-def test_tts_subsystem():
+def test_sound_fx_subsystem():
     print("==================================================")
-    print("[*] TEST: TTS Factory & Qwen3-TTS Adapter Test")
+    print("[*] TEST: Procedural Sound Feedback & Status Audio")
     print("==================================================")
 
     config = AppConfig()
-    config.set("tts_engine", "qwen3")
-    config.set("qwen_tts_model", "Qwen/Qwen3-TTS-12Hz-0.6B-Base")
+    config.set("sound_feedback", True)
+    config.set("sound_pack", "scifi")
 
+    sfx = SoundEffects(config)
+    print(f"[+] Active Sound Pack: {sfx.pack}")
+    print(f"[+] Sound Feedback Enabled: {sfx.enabled}")
+    print(f"[+] Pre-computed Buffers: {list(sfx._buffers.keys())}")
+
+    for key in ["start", "success", "error", "stop", "wake"]:
+        assert key in sfx._buffers, f"Missing buffer for sound '{key}'"
+        assert len(sfx._buffers[key]) > 0, f"Empty buffer for sound '{key}'"
+        assert sfx._buffers[key].dtype == "float32", f"Invalid buffer dtype for '{key}'"
+
+    # Test legacy JarvisVoiceService bridge compatibility
     voice_svc = JarvisVoiceService(config)
-    print(f"[+] Active TTS Adapter: {voice_svc.adapter.get_name()}")
-    print(f"[+] Initial Status: {voice_svc.adapter.get_status()}")
-    print(f"[+] Is Ready: {voice_svc.adapter.is_ready()}")
-    print(f"[+] Voice Enabled: {voice_svc.is_enabled()}")
+    assert voice_svc.is_speaking() == False, "TTS is_speaking must be False"
+    assert voice_svc.is_jarvis_phrase("test") == False, "is_jarvis_phrase must be False"
 
-    # Test Jarvis phrase echo detection
-    test_phrase = "Слушаю вас, сэр."
-    is_echo = voice_svc.is_jarvis_phrase(test_phrase)
-    print(f"[+] Echo detection for '{test_phrase}': {is_echo} (Expected: True)")
-    assert is_echo == True, "Echo detection failed for preset phrase!"
+    # Play non-blocking test sounds
+    sfx.play_start()
+    sfx.play_success()
+    sfx.play_error()
+    sfx.play_stop()
+    sfx.play_wake()
 
-    # Test edge adapter factory creation
-    edge_adapter = TTSFactory.create_adapter("edge", {"tts_voice": "ru-RU-SvetlanaNeural"})
-    print(f"[+] Edge Adapter Created: {edge_adapter.get_name()}")
-
-    print("[OK] TTS Architecture verification passed successfully!")
+    print("[OK] Procedural Sound Feedback verification passed successfully!")
 
 if __name__ == "__main__":
-    test_tts_subsystem()
+    test_sound_fx_subsystem()

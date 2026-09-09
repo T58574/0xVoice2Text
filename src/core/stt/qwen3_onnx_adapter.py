@@ -13,6 +13,67 @@ from src.core.stt.base import BaseSTTAdapter
 
 DEFAULT_HF_REPO = "andrewleech/qwen3-asr-1.7b-onnx"
 
+SUPPORTED_LANGUAGES = [
+    "Chinese", "English", "Cantonese", "Arabic", "German", "French", "Spanish",
+    "Portuguese", "Indonesian", "Italian", "Korean", "Russian", "Thai", "Vietnamese",
+    "Japanese", "Turkish", "Hindi", "Malay", "Dutch", "Swedish", "Danish", "Finnish",
+    "Polish", "Czech", "Filipino", "Persian", "Greek", "Romanian", "Hungarian", "Macedonian"
+]
+
+LANGUAGE_MAP = {
+    "ru": "Russian",
+    "rus": "Russian",
+    "russian": "Russian",
+    "русский": "Russian",
+    "en": "English",
+    "eng": "English",
+    "english": "English",
+    "zh": "Chinese",
+    "chi": "Chinese",
+    "chinese": "Chinese",
+    "yue": "Cantonese",
+    "cantonese": "Cantonese",
+    "de": "German",
+    "german": "German",
+    "fr": "French",
+    "french": "French",
+    "es": "Spanish",
+    "spanish": "Spanish",
+    "pt": "Portuguese",
+    "portuguese": "Portuguese",
+    "id": "Indonesian",
+    "indonesian": "Indonesian",
+    "it": "Italian",
+    "italian": "Italian",
+    "ko": "Korean",
+    "korean": "Korean",
+    "ja": "Japanese",
+    "japanese": "Japanese",
+    "tr": "Turkish",
+    "turkish": "Turkish",
+    "pl": "Polish",
+    "polish": "Polish",
+    "uk": "Russian",
+    "be": "Russian",
+}
+
+def resolve_qwen_language(lang_str: Optional[str]) -> Optional[str]:
+    """
+    Normalizes language codes (e.g. 'ru', 'russian', 'auto') to Qwen3-ASR canonical language names.
+    Defaults to 'Russian' for Russian-first dictation.
+    """
+    if not lang_str:
+        return "Russian"
+    clean = str(lang_str).strip().lower()
+    if clean in ("auto", "none", "", "detect"):
+        return None
+    if clean in LANGUAGE_MAP:
+        return LANGUAGE_MAP[clean]
+    cap = clean.capitalize()
+    if cap in SUPPORTED_LANGUAGES:
+        return cap
+    return "Russian"
+
 class Qwen3ONNXAdapter(BaseSTTAdapter):
     """
     High-Performance Local STT Adapter for Alibaba Qwen3-ASR (1.7B ONNX).
@@ -196,10 +257,21 @@ class Qwen3ONNXAdapter(BaseSTTAdapter):
             audio_len = audio_features.shape[1]
 
             # 3. Prompt Construction & Decoder Init
-            prefix = [151644, 8948, 198, 2610, 525, 264, 10950, 17847, 13, 151645, 198, 151644, 872, 198, 151669]
+            # Official Qwen3-ASR format:
+            # <|im_start|>system\n<|im_end|>\n<|im_start|>user\n<|audio_start|>
+            prefix = [151644, 8948, 198, 151645, 198, 151644, 872, 198, 151669]
             audio_offset = len(prefix)
             audio_pads = [151676] * audio_len
+            # <|audio_end|><|im_end|>\n<|im_start|>assistant\n
             suffix = [151670, 151645, 198, 151644, 77091, 198]
+
+            # Enforce target language (e.g. "Russian") according to official Qwen3-ASR specification
+            target_lang = resolve_qwen_language(language or self.language)
+            if target_lang:
+                lang_prompt = f"language {target_lang}<asr_text>"
+                lang_tokens = self.tokenizer.encode(lang_prompt).ids
+                suffix = suffix + lang_tokens
+
             prompt_tokens = prefix + audio_pads + suffix
 
             input_ids = np.array([prompt_tokens], dtype=np.int64)
@@ -244,7 +316,11 @@ class Qwen3ONNXAdapter(BaseSTTAdapter):
 
             # 5. Decode Tokens and Clean ASR Metadata Tags
             raw_text = self.tokenizer.decode(generated_token_ids).strip()
-            # Strip special tags (e.g. "language None<asr_text>", "<asr_text>", "<|im_end|>")
+            # If <asr_text> was generated in fallback auto mode, take following transcript
+            if "<asr_text>" in raw_text:
+                raw_text = raw_text.split("<asr_text>", 1)[1]
+
+            # Strip any remaining language prefixes or control markers
             import re
             cleaned_text = re.sub(r'^(?:language\s+[a-zA-Z_]+|<asr_text>|\s)+', '', raw_text, flags=re.IGNORECASE)
             transcription = cleaned_text.replace('<|im_end|>', '').replace('<|endoftext|>', '').strip()
