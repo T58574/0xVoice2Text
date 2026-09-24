@@ -38,10 +38,11 @@ class STTEngine:
     def _init_adapter(self):
         with self._lock:
             options = {
-                "qwen_model": self.config.get("qwen_model", "Qwen/Qwen3-ASR-1.7B-hf") if self.config else "Qwen/Qwen3-ASR-1.7B-hf",
-                "groq_model": self.config.get("groq_model", "whisper-large-v3") if self.config else "whisper-large-v3",
+                "whisper_model": self.config.get("whisper_model", "large-v3-turbo") if self.config else "large-v3-turbo",
                 "stt_device": self.device,
-                "language": self.language
+                "compute_type": self.config.get("compute_type", "auto") if self.config else "auto",
+                "language": self.language,
+                "beam_size": self.config.get("beam_size", 1) if self.config else 1
             }
             self.adapter = STTFactory.create_adapter(self.engine_name, options)
 

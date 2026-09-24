@@ -255,47 +255,49 @@ class SettingsDialog(QDialog):
         audio_main_layout.addWidget(audio_group)
 
         # STT Engine Selection Group
-        model_group = QGroupBox("ДВИЖОК РАСПОЗНАВАНИЯ РЕЧИ (STT)")
+        model_group = QGroupBox("ДВИЖОК РАСПОЗНАВАНИЯ РЕЧИ (WHISPER STT)")
         model_layout = QVBoxLayout()
         model_layout.setSpacing(8)
 
-        lbl_engine = QLabel("STT Провайдер / Архитектура:")
-        self.combo_stt_engine = QComboBox()
-        engines = [
-            ("[LOCAL] Qwen3-ASR (Local SOTA 2026, GPU DirectML / AVX2)", "qwen3"),
-            ("[CLOUD] Groq Cloud API (Whisper-Large-v3)", "groq")
+        lbl_whisper_m = QLabel("Модель распознавания (OpenAI Whisper):")
+        self.combo_whisper_model = QComboBox()
+        whisper_models = [
+            ("Whisper Large-v3-Turbo (Сверхбыстрая, ~800M, sub-300ms на CPU) [Рекомендуется]", "large-v3-turbo"),
+            ("Whisper Large-v3 (Максимальная точность, ~1.5B параметров)", "large-v3"),
         ]
-        curr_engine = self.config.get("stt_engine", "qwen3")
-        engine_idx = 0
-        for i, (lbl, val) in enumerate(engines):
-            self.combo_stt_engine.addItem(lbl, val)
-            if val == curr_engine:
-                engine_idx = i
-        self.combo_stt_engine.setCurrentIndex(engine_idx)
-        model_layout.addWidget(lbl_engine)
-        model_layout.addWidget(self.combo_stt_engine)
+        curr_whisper_m = str(self.config.get("whisper_model", "large-v3-turbo")).lower()
+        whisper_idx = 0
+        for i, (lbl, val) in enumerate(whisper_models):
+            self.combo_whisper_model.addItem(lbl, val)
+            if val == curr_whisper_m or (val == "large-v3-turbo" and "turbo" in curr_whisper_m):
+                whisper_idx = i
+            elif val == "large-v3" and "turbo" not in curr_whisper_m and "large" in curr_whisper_m:
+                whisper_idx = i
+        self.combo_whisper_model.setCurrentIndex(whisper_idx)
+        model_layout.addWidget(lbl_whisper_m)
+        model_layout.addWidget(self.combo_whisper_model)
 
-        lbl_qwen_m = QLabel("Модель Qwen3-ASR:")
-        self.combo_qwen_model = QComboBox()
-        qwen_models = [
-            ("Qwen3-ASR-1.7B ONNX (DirectML GPU / RX 7800 XT 16GB)", "andrewleech/qwen3-asr-1.7b-onnx"),
-            ("Qwen3-ASR-1.7B PyTorch (CPU AVX2)", "Qwen/Qwen3-ASR-1.7B-hf"),
+        lbl_compute = QLabel("Точность вычислений (Compute Precision):")
+        self.combo_compute_type = QComboBox()
+        compute_list = [
+            ("INT8 (Максимальная скорость CPU AVX2, минимум RAM) [Рекомендуется]", "int8"),
+            ("Float32 (Полная точность на CPU)", "float32"),
+            ("Float16 (Для NVIDIA CUDA GPU)", "float16"),
         ]
-        curr_qwen_m = self.config.get("qwen_model", "andrewleech/qwen3-asr-1.7b-onnx")
-        qwen_idx = 0
-        for i, (lbl, val) in enumerate(qwen_models):
-            self.combo_qwen_model.addItem(lbl, val)
-            if val == curr_qwen_m:
-                qwen_idx = i
-        self.combo_qwen_model.setCurrentIndex(qwen_idx)
-        model_layout.addWidget(lbl_qwen_m)
-        model_layout.addWidget(self.combo_qwen_model)
+        curr_compute = self.config.get("compute_type", "int8")
+        compute_idx = 0
+        for i, (lbl, val) in enumerate(compute_list):
+            self.combo_compute_type.addItem(lbl, val)
+            if val == curr_compute:
+                compute_idx = i
+        self.combo_compute_type.setCurrentIndex(compute_idx)
+        model_layout.addWidget(lbl_compute)
+        model_layout.addWidget(self.combo_compute_type)
 
         lbl_device = QLabel("Вычислительное устройство (Hardware Target):")
         self.combo_stt_device = QComboBox()
         devices_list = [
-            ("DirectML GPU (AMD Radeon RX 7800 XT / DirectX 12)", "directml"),
-            ("Auto (DirectML RX 7800 XT / CUDA / CPU AVX2)", "auto"),
+            ("Auto (Оптимально: многоядерный AVX2 CPU / CUDA)", "auto"),
             ("CPU (Intel Core i7-14700KF 20 Cores / AVX2)", "cpu"),
             ("NVIDIA CUDA (при наличии)", "cuda"),
         ]
@@ -467,8 +469,9 @@ class SettingsDialog(QDialog):
             # Collect all settings into a single dict for batch-write (1 disk I/O)
             updates = {
                 "audio_device": self.combo_mic.currentData(),
-                "stt_engine": self.combo_stt_engine.currentData(),
-                "qwen_model": self.combo_qwen_model.currentData(),
+                "stt_engine": "whisper",
+                "whisper_model": self.combo_whisper_model.currentData(),
+                "compute_type": self.combo_compute_type.currentData(),
                 "stt_device": self.combo_stt_device.currentData(),
                 "language": self.combo_lang.currentData(),
                 "hotkey": self.combo_hk.currentData(),

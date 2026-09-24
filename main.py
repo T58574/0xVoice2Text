@@ -383,13 +383,14 @@ class ApplicationController:
         def _reload_stt():
             try:
                 stt_opts = {
-                    "qwen_model": self.config.get("qwen_model", "Qwen/Qwen3-ASR-1.7B-hf"),
-                    "groq_model": self.config.get("groq_model", "whisper-large-v3"),
+                    "whisper_model": self.config.get("whisper_model", "large-v3-turbo"),
                     "stt_device": self.config.get("stt_device", "auto"),
-                    "language": self.config.get("language", "ru")
+                    "compute_type": self.config.get("compute_type", "auto"),
+                    "language": self.config.get("language", "ru"),
+                    "beam_size": self.config.get("beam_size", 1)
                 }
                 self.stt.switch_engine(
-                    self.config.get("stt_engine", "qwen3"),
+                    self.config.get("stt_engine", "whisper"),
                     options=stt_opts,
                     on_complete=lambda ok: self.bridge.model_loaded.emit(ok)
                 )

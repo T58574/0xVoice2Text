@@ -7,14 +7,12 @@ CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
 OLD_CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 
 DEFAULT_CONFIG = {
-    "stt_engine": "qwen3",           # qwen3 (DirectML ONNX), groq
-    "qwen_model": "andrewleech/qwen3-asr-1.7b-onnx", # DirectML ONNX GPU SOTA
-    "groq_model": "whisper-large-v3",
-    "stt_device": "auto",            # auto (DirectML RX 7800 XT / CUDA / AVX2), directml, cpu, cuda
-    "model_size": "whisper-large-v3",
+    "stt_engine": "whisper",         # whisper (faster-whisper AVX2 / CUDA)
+    "whisper_model": "large-v3-turbo", # large-v3-turbo, large-v3
+    "stt_device": "auto",            # auto (CPU AVX2 / CUDA), cpu, cuda
+    "compute_type": "int8",          # int8 (fastest CPU), float32, float16 (CUDA)
+    "beam_size": 1,                  # 1 for sub-300ms turbo, 3-5 for max accuracy
     "language": "ru",
-    "device": "auto",
-    "compute_type": "default",
     "hotkey": "ctrl+space",          # ctrl+space, alt+3, caps_lock, f8, f9, etc.
     "hotkey_mode": "toggle",         # toggle, push_to_talk
     "wake_word_enabled": True,       # Enable voice wake word trigger
